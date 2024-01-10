@@ -9,7 +9,7 @@ const tailorSchema = new mongoose.Schema({
     type: Number,
     required: [true, "Phone number is required"],
   },
-  userDocument: {
+  user_id: {
     type: mongoose.SchemaTypes.ObjectId,
     ref: "user",
   },

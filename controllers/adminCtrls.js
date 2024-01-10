@@ -12,6 +12,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { upload } from "../middlewares/multer.js";
 import uploadOnCloudinary from "../utils/cloudinary.js";
+import { unLinkFile } from "../utils/unLinkFile.js";
 
 import UserModel from "../models/UserModel.js";
 import HelperModel from "../models/HelperModel.js";
@@ -40,6 +41,7 @@ import StitchBillModel from "../models/StitchBillModel.js";
 // 10. Saving the new user
 // 11. Sending the response to the frontend
 
+// Add || POST
 const addAdmin = asyncHandler(async (req, res) => {
   // Step 1
   const { name, phoneNumber } = req.body;
@@ -68,28 +70,14 @@ const addAdmin = asyncHandler(async (req, res) => {
   const avatar = await uploadOnCloudinary(localpath);
   if (!avatar) throw new ApiError(400, "Avatar is required");
 
-  // Step 6
-  let splittedFileName;
-  if (localpath.includes("\\")) {
-    console.log("Windows");
-    splittedFileName = localpath.split("\\");
+  /// Step 6
+  const unlinked = unLinkFile(localpath);
+  if (unlinked) {
+    console.log("File deleted successfully");
   } else {
-    console.log("Linux");
-    splittedFileName = localpath.split("/");
+    throw new ApiError(400, "Error in deleting the file");
   }
-  const fileNameToBeDeleted = splittedFileName[splittedFileName.length - 1];
-  console.log("fileNameToBeDeleted : ", fileNameToBeDeleted);
-  const filePath = path.join(
-    __dirname,
-    `../public/temp/${fileNameToBeDeleted}`
-  );
-  console.log("filePath : ", filePath);
-  fs.unlink(filePath, (err) => {
-    if (err) {
-      console.error(err);
-      return;
-    }
-  });
+
   // Step 7
   const newUser = await UserModel.create({
     name,
@@ -152,27 +140,12 @@ const addHelper = asyncHandler(async (req, res) => {
   if (!avatar) throw new ApiError(400, "Avatar is required in cloudinary url");
 
   // Step 6
-  let splittedFileName;
-  if (localpath.includes("\\")) {
-    console.log("Windows");
-    splittedFileName = localpath.split("\\");
+  const unlinked = unLinkFile(localpath);
+  if (unlinked) {
+    console.log("File deleted successfully");
   } else {
-    console.log("Linux");
-    splittedFileName = localpath.split("/");
+    throw new ApiError(400, "Error in deleting the file");
   }
-  const fileNameToBeDeleted = splittedFileName[splittedFileName.length - 1];
-  console.log("fileNameToBeDeleted : ", fileNameToBeDeleted);
-  const filePath = path.join(
-    __dirname,
-    `../public/temp/${fileNameToBeDeleted}`
-  );
-  console.log("filePath : ", filePath);
-  fs.unlink(filePath, (err) => {
-    if (err) {
-      console.error(err);
-      return;
-    }
-  });
 
   // Step 7
   const newUser = await UserModel.create({
@@ -248,27 +221,13 @@ const addCM = asyncHandler(async (req, res) => {
   if (!avatar) throw new ApiError(400, "Avatar is required");
 
   // Step 6
-  let splittedFileName;
-  if (localpath.includes("\\")) {
-    console.log("Windows");
-    splittedFileName = localpath.split("\\");
+  const unlinked = unLinkFile(localpath);
+  if (unlinked) {
+    console.log("File deleted successfully");
   } else {
-    console.log("Linux");
-    splittedFileName = localpath.split("/");
+    throw new ApiError(400, "Error in deleting the file");
   }
-  const fileNameToBeDeleted = splittedFileName[splittedFileName.length - 1];
-  console.log("fileNameToBeDeleted : ", fileNameToBeDeleted);
-  const filePath = path.join(
-    __dirname,
-    `../public/temp/${fileNameToBeDeleted}`
-  );
-  console.log("filePath : ", filePath);
-  fs.unlink(filePath, (err) => {
-    if (err) {
-      console.error(err);
-      return;
-    }
-  });
+
   // Step 7
   const newUser = await UserModel.create({
     name,
@@ -356,27 +315,12 @@ const addTailor = asyncHandler(async (req, res) => {
   if (!avatar) throw new ApiError(400, "Avatar is required");
 
   // Step 6
-  let splittedFileName;
-  if (localpath.includes("\\")) {
-    console.log("Windows");
-    splittedFileName = localpath.split("\\");
+  const unlinked = unLinkFile(localpath);
+  if (unlinked) {
+    console.log("File deleted successfully");
   } else {
-    console.log("Linux");
-    splittedFileName = localpath.split("/");
+    throw new ApiError(400, "Error in deleting the file");
   }
-  const fileNameToBeDeleted = splittedFileName[splittedFileName.length - 1];
-  console.log("fileNameToBeDeleted : ", fileNameToBeDeleted);
-  const filePath = path.join(
-    __dirname,
-    `../public/temp/${fileNameToBeDeleted}`
-  );
-  console.log("filePath : ", filePath);
-  fs.unlink(filePath, (err) => {
-    if (err) {
-      console.error(err);
-      return;
-    }
-  });
 
   // Step 7
   const newUser = await UserModel.create({
@@ -464,27 +408,12 @@ const addCustomer = asyncHandler(async (req, res) => {
   if (!avatar) throw new ApiError(400, "Avatar is required");
 
   // Step 6
-  let splittedFileName;
-  if (localpath.includes("\\")) {
-    console.log("Windows");
-    splittedFileName = localpath.split("\\");
+  const unlinked = unLinkFile(localpath);
+  if (unlinked) {
+    console.log("File deleted successfully");
   } else {
-    console.log("Linux");
-    splittedFileName = localpath.split("/");
+    throw new ApiError(400, "Error in deleting the file");
   }
-  const fileNameToBeDeleted = splittedFileName[splittedFileName.length - 1];
-  console.log("fileNameToBeDeleted : ", fileNameToBeDeleted);
-  const filePath = path.join(
-    __dirname,
-    `../public/temp/${fileNameToBeDeleted}`
-  );
-  console.log("filePath : ", filePath);
-  fs.unlink(filePath, (err) => {
-    if (err) {
-      console.error(err);
-      return;
-    }
-  });
 
   // Step 7
   const newUser = await UserModel.create({
@@ -567,7 +496,7 @@ const addClothingItem = asyncHandler(async (req, res) => {
 });
 
 const addMeasurement = asyncHandler(async (req, res) => {
-  const { id } = req.params;
+  const { id } = req.params; // customer id
   const { measurements, customerRequirements, drawing } = req.body;
   if (measurements === undefined) {
     throw new ApiError(400, "Measurements are Required");
@@ -673,13 +602,13 @@ const addMeasurement = asyncHandler(async (req, res) => {
   const customer = await CustomerModel.findById(id);
   customer.measurements.push(newMeasurement._id);
   if (!customer) throw new ApiError(404, "Customer not found");
-  await customer.save();
   const measurementHistory = await MeasurementHistoryModel.create({
     measurement_id: newMeasurement._id,
     customer_id: id,
   });
   if (!measurementHistory)
     throw new ApiError(500, "Cannot add history of measurement");
+  await customer.save();
   await measurementHistory.save();
   return res
     .status(201)
@@ -784,10 +713,118 @@ const addStitchBill = asyncHandler(async (req, res) => {
   });
   if (!newStitchBill)
     throw new ApiError(500, "Something went wrong while creating the user");
+  const customer = await CustomerModel.findById(customer_id);
+  customer.stitchedBill.push(newStitchBill._id);
+  if (!customer) throw new ApiError(404, "Customer not found");
+  await customer.save();
   await newStitchBill.save();
   return res
     .status(201)
     .json(new ApiResponse(201, "Add Stitch Bill for customer successfully"));
+});
+
+// PATCH || Employee Details || AVATAR middleware needed
+// *work and their amounts are not updated here
+const updateEmployee = asyncHandler(async (req, res) => {
+  const { id } = req.params; // user id
+  const {
+    name,
+    phoneNumber,
+    avatar,
+    role,
+    password,
+    advance,
+    earned,
+    monthly,
+  } = req.body;
+  if (role === "HELPER") {
+    const helper = await HelperModel.findOne({ user_id: id });
+    if (!helper) throw new ApiError(404, "Helper not found");
+    if (name) helper.name = name;
+    if (phoneNumber) helper.phoneNumber = phoneNumber;
+    if (avatar) {
+      const localpath = req.files?.avatar[0]?.path;
+      if (!localpath) throw new ApiError(400, "Avatar is required");
+      const newAvatar = await uploadOnCloudinary(localpath);
+      if (!newAvatar) throw new ApiError(400, "Avatar is required");
+      helper.avatar = newAvatar;
+      const unlinked = unLinkFile(localpath);
+      if (unlinked) {
+        console.log("File deleted successfully");
+      } else {
+        throw new ApiError(400, "Error in deleting the file");
+      }
+    }
+    if (password) helper.password = password;
+    if (advance) helper.advance = advance;
+    if (earned) helper.earned = earned;
+    if (monthly) helper.monthly = monthly;
+   
+    await helper.save();
+    return res
+      .status(200)
+      .json(new ApiResponse(200, helper, "Helper Updated Successfully"));
+  }
+  if (role === "CUTTING MASTER") {
+    const cuttingMaster = await CuttingMasterModel.findOne({ user_id: id });
+    if (!cuttingMaster) throw new ApiError(404, "Cutting Master not found");
+    if (name) cuttingMaster.name = name;
+    if (phoneNumber) cuttingMaster.phoneNumber = phoneNumber;
+    if (avatar) {
+      const localpath = req.files?.avatar[0]?.path;
+      if (!localpath) throw new ApiError(400, "Avatar is required");
+      const newAvatar = await uploadOnCloudinary(localpath);
+      if (!newAvatar) throw new ApiError(400, "Avatar is required");
+      cuttingMaster.avatar = newAvatar;
+      const unlinked = unLinkFile(localpath);
+      if (unlinked) {
+        console.log("File deleted successfully");
+      } else {
+        throw new ApiError(400, "Error in deleting the file");
+      }
+    }
+    if (password) cuttingMaster.password = password;
+    if (advance) cuttingMaster.advance = advance;
+    if (earned) cuttingMaster.earned = earned;
+    if (monthly) cuttingMaster.monthly = monthly;
+    await cuttingMaster.save();
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          cuttingMaster,
+          "Cutting Master Updated Successfully"
+        )
+      );
+  }
+  if (role === "TAILOR") {
+    const tailor = await TailorModel.findOne({ user_id: id });
+    if (!tailor) throw new ApiError(404, "Tailor not found");
+    if (name) tailor.name = name;
+    if (phoneNumber) tailor.phoneNumber = phoneNumber;
+    if (avatar) {
+      const localpath = req.files?.avatar[0]?.path;
+      if (!localpath) throw new ApiError(400, "Avatar is required");
+      const newAvatar = await uploadOnCloudinary(localpath);
+      if (!newAvatar) throw new ApiError(400, "Avatar is required");
+      tailor.avatar = newAvatar;
+      const unlinked = unLinkFile(localpath);
+      if (unlinked) {
+        console.log("File deleted successfully");
+      } else {
+        throw new ApiError(400, "Error in deleting the file");
+      }
+    }
+    if (password) tailor.password = password;
+    if (advance) tailor.advance = advance;
+    if (earned) tailor.earned = earned;
+    if (monthly) tailor.monthly = monthly;
+    await tailor.save();
+    return res
+      .status(200)
+      .json(new ApiResponse(200, tailor, "Tailor Updated Successfully"));
+  }
 });
 
 export {
@@ -799,4 +836,6 @@ export {
   addClothingItem,
   addMeasurement,
   addSoldBill,
+  addStitchBill,
+  updateEmployee,
 };

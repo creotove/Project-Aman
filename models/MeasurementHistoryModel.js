@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
+
 
 const measurementHistorySchema = new mongoose.Schema({
   meaurement_id: {

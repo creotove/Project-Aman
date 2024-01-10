@@ -5,7 +5,7 @@ const cuttingMasterSchema = new mongoose.Schema({
     type: String,
     required: [true, "Name is required"],
   },
-  userDocument: {
+  user_id: {
     type: mongoose.SchemaTypes.ObjectId,
     ref: "user",
   },
