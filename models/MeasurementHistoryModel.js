@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 
 const measurementHistorySchema = new mongoose.Schema({
-  meaurement_id: {
+  measurement_id: {
     type: mongoose.SchemaTypes.ObjectId,
     ref: "measurement",
   },

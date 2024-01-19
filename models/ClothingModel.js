@@ -10,7 +10,7 @@ const clothingSchema = new mongoose.Schema({
     type: Number,
     required: [true, "Default Stitching is required"],
   },
-  defaultstitchingAmt: {
+  defaultStitchingAmt: {
     // For Tailor
     type: Number,
     default: 0,

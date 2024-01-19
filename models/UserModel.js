@@ -20,7 +20,7 @@ const userSchema = new mongoose.Schema({
   },
   avatar: {
     type: String,
-    required: [true, "Pic is required"],
+    default: "https://www.w3schools.com/howto/img_avatar.png",
   },
   refreshToken: {
     type: String,

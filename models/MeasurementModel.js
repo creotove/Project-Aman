@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const measurementSchema = new mongoose.Schema(
   {
-    name: {
+    name: { // Cloth Measurement Name
       type: String,
       required: [true, "Name is required"],
     },
@@ -13,15 +13,7 @@ const measurementSchema = new mongoose.Schema(
     measurements: {
       type: Map,
       of: {
-        type: mongoose.Schema.Types.Mixed,
-        validate: {
-          validator: function (measurement) {
-            // Assuming ClothingItem is another Mongoose model/schema
-            // You need to replace 'ClothingItem' with the actual model name
-            return this.model("ClothingItem").isValidMeasurement(measurement);
-          },
-          message: "Invalid measurement for the specified clothing item.",
-        },
+        type: Number,
       },
       default: {},
     },
@@ -33,7 +25,7 @@ const measurementSchema = new mongoose.Schema(
           description: String,
         },
       ],
-      default: [{ name: "No Customer Requirements", value: "", description: "" }],
+      default: [{ name: "No Req.", value: "", description: "" }],
     },
     drawing: {
       type: String,
@@ -44,7 +36,6 @@ const measurementSchema = new mongoose.Schema(
 
 const MeasurementModel = mongoose.model("measurement", measurementSchema);
 export default MeasurementModel;
-
 // const measurement = [
 //   {
 //     name: "Shirt",

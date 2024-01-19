@@ -1,16 +1,8 @@
 import bcryptjs from "bcryptjs";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-import { dirname } from "path";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { upload } from "../middlewares/multer.js";
 import uploadOnCloudinary from "../utils/cloudinary.js";
 import { unLinkFile } from "../utils/unLinkFile.js";
 
@@ -24,6 +16,8 @@ import CustomerModel from "../models/CustomerModel.js";
 import MeasurementHistoryModel from "../models/MeasurementHistoryModel.js";
 import SoldBillModel from "../models/SoldBillModel.js";
 import StitchBillModel from "../models/StitchBillModel.js";
+import { analyticsAdd } from "../utils/analyticsAdd.js";
+import BillNumberCounter from "../models/BillNumberCounter.js";
 
 // Steps to create Customer & Employee
 // 1. Extract the values from the body
@@ -378,108 +372,134 @@ const addTailor = asyncHandler(async (req, res) => {
     );
 });
 
-const addCustomer = asyncHandler(async (req, res) => {
-  // Step 1
-  const { name, phoneNumber } = req.body;
+// const addCustomer = asyncHandler(async (req, res) => {
+//   // Step 1
+//   const { name, phoneNumber } = req.body;
 
-  // Step 2
-  if (name.trim() === "") {
-    throw new ApiError(400, "Name is Required");
-  } else if (phoneNumber === undefined) {
-    throw new ApiError(400, "Phone number is Required");
-  }
+//   // Step 2
+//   if (name.trim() === "") {
+//     throw new ApiError(400, "Name is Required");
+//   } else if (phoneNumber === undefined) {
+//     throw new ApiError(400, "Phone number is Required");
+//   }
+//   // Step 2 try
+//   [name, phoneNumber].some((field) => {
+//     if (field.trim() === "") {
+//       throw new ApiError(400, `${field} is Required`);
+//     }
+//   });
 
-  // Step 3
-  const existedUser = await UserModel.findOne({
-    $or: [{ phoneNumber }, { name }],
-  });
-  if (existedUser) {
-    throw new ApiError(409, "User already exists");
-  }
+//   // Step 3
+//   const existedUser = await UserModel.findOne({
+//     $or: [{ phoneNumber }, { name }],
+//   });
+//   if (existedUser) {
+//     throw new ApiError(409, "User already exists");
+//   }
 
-  // Step 4
-  const salt = await bcryptjs.genSalt(10);
-  const hashedPassword = await bcryptjs.hash(phoneNumber, salt);
+//   // Step 4
+//   const salt = await bcryptjs.genSalt(10);
+//   const hashedPassword = await bcryptjs.hash(phoneNumber, salt);
 
-  // Step 5
-  const localpath = req.files?.avatar[0]?.path;
-  if (!localpath) throw new ApiError(400, "Avatar is required");
-  const avatar = await uploadOnCloudinary(localpath);
-  if (!avatar) throw new ApiError(400, "Avatar is required");
+//   // Step 5
+//   const localpath = req.files?.avatar[0]?.path;
+//   if (!localpath) throw new ApiError(400, "Avatar is required");
+//   const avatar = await uploadOnCloudinary(localpath);
+//   if (!avatar) throw new ApiError(400, "Avatar is required");
 
-  // Step 6
-  const unlinked = unLinkFile(localpath);
-  if (unlinked) {
-    console.log("File deleted successfully");
-  } else {
-    throw new ApiError(400, "Error in deleting the file");
-  }
+//   // Step 6
+//   const unlinked = unLinkFile(localpath);
+//   if (unlinked) {
+//     console.log("File deleted successfully");
+//   } else {
+//     throw new ApiError(400, "Error in deleting the file");
+//   }
 
-  // Step 7
-  const newUser = await UserModel.create({
-    name,
-    password: hashedPassword,
-    phoneNumber,
-    avatar: avatar.url,
-    role: "CUSTOMER",
-  });
+//   // Step 7
+//   const newUser = await UserModel.create({
+//     name,
+//     password: hashedPassword,
+//     phoneNumber,
+//     avatar: avatar.url,
+//     role: "CUSTOMER",
+//   });
 
-  // Step 8
-  if (!newUser)
-    throw new ApiError(500, "Something went wrong while creating the user");
+//   // Step 8
+//   if (!newUser)
+//     throw new ApiError(500, "Something went wrong while creating the user");
 
-  // Step 8.1
-  const newCustomer = CustomerModel.create({
-    name,
-    user_id: newUser._id,
-  });
+//   // Step 8.1
+//   const newCustomer = CustomerModel.create({
+//     name,
+//     user_id: newUser._id,
+//   });
 
-  // Step 8.2
-  if (!newCustomer)
-    throw new ApiError(500, "Something went wrong while creating the user");
+//   // Step 8.2
+//   if (!newCustomer)
+//     throw new ApiError(500, "Something went wrong while creating the user");
 
-  // Step 8.3
-  (await newCustomer).save();
+//   // Step 8.3
+//   (await newCustomer).save();
 
-  // Step 9
-  const createdUser = await UserModel.findById(newUser._id).select(
-    "-password -refreshToken"
-  );
-  if (!createdUser) {
-    throw new ApiError(500, "Something went wrong while creating the user");
-  }
+//   // Step 9
+//   const createdUser = await UserModel.findById(newUser._id).select(
+//     "-password -refreshToken"
+//   );
+//   if (!createdUser) {
+//     throw new ApiError(500, "Something went wrong while fetching the user");
+//   }
 
-  // Step 10
-  await newUser.save();
+//   // Step 10
+//   await newUser.save();
 
-  // Step 11
-  return res
-    .status(201)
-    .json(new ApiResponse(201, createdUser, "User registered successfully"));
-});
+//   // Step 11
+//   return res
+//     .status(201)
+//     .json(new ApiResponse(201, createdUser, "User registered successfully"));
+// });
 
 const addClothingItem = asyncHandler(async (req, res) => {
-  const { name, stitching, defaultStitchingAmt, defaultCuttingAmt } = req.body;
+  const { name, stitchingAmt, defaultStitchingAmt, defaultCuttingAmt } =
+    req.body;
   if (name.trim() === "") {
     throw new ApiError(400, "Name is Required");
-  } else if (stitching === undefined) {
+  } else if (stitchingAmt === undefined) {
     throw new ApiError(400, "Stitching is Required");
   } else if (defaultStitchingAmt === undefined) {
     throw new ApiError(400, "Default Stitching Amount is Required");
   } else if (defaultCuttingAmt === undefined) {
     throw new ApiError(400, "Default Cutting Amount is Required");
   }
+
   const existedClothingItem = await ClothingModel.findOne({
     name,
   });
   if (existedClothingItem) {
     throw new ApiError(409, "Clothing Item already exists");
   }
+  let imageUrl;
+  if (req.files?.image) {
+    console.log("in image upload");
+    const localpath = req.files?.image[0]?.path;
+    if (!localpath) throw new ApiError(400, "Image is required");
+    const image = await uploadOnCloudinary(localpath);
+    imageUrl = image.url;
+    if (!image) throw new ApiError(400, "Image is required");
+
+    const unlinked = unLinkFile(localpath);
+    if (unlinked) {
+      console.log("File deleted successfully");
+    } else {
+      throw new ApiError(400, "Error in deleting the file");
+    }
+  }
+
   const newClothingItem = await ClothingModel.create({
     name,
-    stitching,
+    stitchingAmt,
     defaultStitchingAmt,
     defaultCuttingAmt,
+    image: imageUrl ? imageUrl : "N/A",
   });
   if (!newClothingItem)
     throw new ApiError(500, "Something went wrong while creating the user");
@@ -497,165 +517,108 @@ const addClothingItem = asyncHandler(async (req, res) => {
 
 const addMeasurement = asyncHandler(async (req, res) => {
   const { id } = req.params; // customer id
-  const { measurements, customerRequirements, drawing } = req.body;
+  const { measurements, customerRequirements, name } = req.body;
   if (measurements === undefined) {
     throw new ApiError(400, "Measurements are Required");
   } else if (id === undefined) {
     throw new ApiError(400, "Customer Id is Required");
   }
-  let newMeasurement;
-  if (customerRequirements) {
-    newMeasurement = await MeasurementModel.create({
-      customer_id: id,
-      measurements,
-      customerRequirements,
-    });
-    if (!newMeasurement)
-      throw new ApiError(500, "Something went wrong while creating the user");
-    await newMeasurement.save();
-  }
-  if (drawing) {
-    upload.fields([
-      {
-        name: "drawing",
-        maxCount: 1,
-      },
-    ]);
-    const localpath = req.files?.drawing[0]?.path;
-    if (!localpath) throw new ApiError(400, "Drawing is required");
-    const drawingOnCloudinary = await uploadOnCloudinary(localpath);
-    if (!drawingOnCloudinary) throw new ApiError(400, "Drawing is required");
-
-    let splittedFileName;
-    if (localpath.includes("\\")) {
-      console.log("Windows");
-      splittedFileName = localpath.split("\\");
-    } else {
-      console.log("Linux");
-      splittedFileName = localpath.split("/");
-    }
-    const fileNameToBeDeleted = splittedFileName[splittedFileName.length - 1];
-    console.log("fileNameToBeDeleted : ", fileNameToBeDeleted);
-    const filePath = path.join(
-      __dirname,
-      `../public/temp/${fileNameToBeDeleted}`
-    );
-    console.log("filePath : ", filePath);
-    fs.unlink(filePath, (err) => {
-      if (err) {
-        console.error(err);
-        return;
-      }
-    });
-    newMeasurement = await MeasurementModel.create({
-      customer_id: id,
-      measurements,
-      drawing,
-    });
-    if (!newMeasurement)
-      throw new ApiError(500, "Something went wrong while creating the user");
-    await newMeasurement.save();
-  }
-  if (customerRequirements && drawing) {
-    upload.fields([
-      {
-        name: "drawing",
-        maxCount: 1,
-      },
-    ]);
-    const localpath = req.files?.drawing[0]?.path;
-    if (!localpath) throw new ApiError(400, "Drawing is required");
-    const drawingOnCloudinary = await uploadOnCloudinary(localpath);
-    if (!drawingOnCloudinary) throw new ApiError(400, "Drawing is required");
-
-    let splittedFileName;
-    if (localpath.includes("\\")) {
-      console.log("Windows");
-      splittedFileName = localpath.split("\\");
-    } else {
-      console.log("Linux");
-      splittedFileName = localpath.split("/");
-    }
-    const fileNameToBeDeleted = splittedFileName[splittedFileName.length - 1];
-    console.log("fileNameToBeDeleted : ", fileNameToBeDeleted);
-    const filePath = path.join(
-      __dirname,
-      `../public/temp/${fileNameToBeDeleted}`
-    );
-    console.log("filePath : ", filePath);
-    fs.unlink(filePath, (err) => {
-      if (err) {
-        console.error(err);
-        return;
-      }
-    });
-    newMeasurement = await MeasurementModel.create({
-      customer_id: id,
-      measurements,
-      customerRequirements,
-      drawing,
-    });
-    if (!newMeasurement)
-      throw new ApiError(500, "Something went wrong while creating the user");
-    await newMeasurement.save();
-  }
-  const customer = await CustomerModel.findById(id);
-  customer.measurements.push(newMeasurement._id);
-  if (!customer) throw new ApiError(404, "Customer not found");
-  const measurementHistory = await MeasurementHistoryModel.create({
-    measurement_id: newMeasurement._id,
+  const newMeasurements = await MeasurementModel.create({
+    name,
+    customer_id: id,
+    measurements,
+    customerRequirements: customerRequirements
+      ? customerRequirements
+      : [{ name: "No Req.", value: "", description: "" }],
+  });
+  if (!newMeasurements)
+    throw new ApiError(500, "Something went wrong while creating the user");
+  const newMeasurementHistory = await MeasurementHistoryModel.create({
+    measurement_id: newMeasurements._id,
     customer_id: id,
   });
-  if (!measurementHistory)
-    throw new ApiError(500, "Cannot add history of measurement");
-  await customer.save();
-  await measurementHistory.save();
+  if (!newMeasurementHistory)
+    throw new ApiError(500, "Something went wrong while creating the user");
+  await newMeasurementHistory.save();
+  await newMeasurements.save();
+
   return res
     .status(201)
     .json(new ApiResponse(201, "Add Measurement for customer successfully"));
 });
 
 const addSoldBill = asyncHandler(async (req, res) => {
-  const {
-    name,
-    user_id,
-    customer_id,
-    billNumber,
-    phoneNumber,
-    clothAmt,
-    // clothes,
-    totalAmt,
-  } = req.body;
-  if (name.trim() === "") {
-    throw new ApiError(400, "Name is Required");
-  } else if (user_id === undefined) {
-    throw new ApiError(400, "User Id is Required");
-  } else if (customer_id === undefined) {
-    throw new ApiError(400, "Customer Id is Required");
-  } else if (billNumber === undefined) {
-    throw new ApiError(400, "Bill Number is Required");
-  } else if (phoneNumber === undefined) {
-    throw new ApiError(400, "Phone Number is Required");
-  } else if (clothAmt === undefined) {
-    throw new ApiError(400, "Cloth Amount is Required");
-  } else if (clothes === undefined) {
-    throw new ApiError(400, "Clothes is Required");
-  } else if (totalAmt === undefined) {
-    throw new ApiError(400, "Total Amount is Required");
-  }
-  const newSoldBill = await SoldBillModel.create({
-    name,
-    user_id,
-    customer_id,
-    billNumber,
-    phoneNumber,
-    clothAmt,
-    // clothes,
-    totalAmt,
+  const { name, phoneNumber, totalAmt } = req.body;
+  [name, phoneNumber, totalAmt].some((field) => {
+    if (field === undefined) {
+      throw new ApiError(400, `${field} is Required`);
+    }
   });
-  if (!newSoldBill)
-    throw new ApiError(500, "Something went wrong while creating the user");
-  await newSoldBill.save();
+  const customer = await CustomerModel.findOne({ phoneNumber });
+  const billNumber = await BillNumberCounter.findOne();
+  if (!billNumber) {
+    const newBillNumber = await BillNumberCounter.create({
+      billNumber: 1,
+    });
+    if (!newBillNumber)
+      throw new ApiError(
+        500,
+        "Something went wrong while creating bill number"
+      );
+    await newBillNumber.save();
+  }
+  if (!customer) {
+    const salt = await bcryptjs.genSalt(10);
+    const hashedPassword = await bcryptjs.hash(phoneNumber.toString(), salt);
+
+    const newUser = await UserModel.create({
+      name,
+      phoneNumber,
+      role: "CUSTOMER",
+      password: hashedPassword,
+    });
+    if (!newUser)
+      throw new ApiError(500, "Something went wrong while creating the user");
+    const newCustomer = await CustomerModel.create({
+      name,
+      user_id: newUser._id,
+    });
+    if (!newCustomer)
+      throw new ApiError(500, "Something went wrong while creating the user");
+    await newUser.save();
+    const newSoldBill = await SoldBillModel.create({
+      name,
+      user_id: newUser._id,
+      customer_id: newCustomer._id,
+      phoneNumber,
+      totalAmt,
+      billNumber: billNumber.billNumber + 1,
+    });
+    if (!newSoldBill)
+      throw new ApiError(500, "Something went wrong while creating the user");
+    newCustomer.purchasedBill.push(newSoldBill._id);
+    await newCustomer.save();
+    await newSoldBill.save();
+  } else {
+    const newSoldBill = await SoldBillModel.create({
+      name,
+      user_id: customer.user_id,
+      customer_id: customer._id,
+      phoneNumber,
+      totalAmt,
+      billNumber: billNumber.billNumber + 1,
+    });
+    if (!newSoldBill)
+      throw new ApiError(500, "Something went wrong while creating the user");
+    billNumber.billNumber = billNumber.billNumber + 1;
+    await billNumber.save();
+    await newSoldBill.save();
+    await customer.save();
+  }
+
+  // Analytics for Stitch Bill
+  analyticsAdd(totalAmt, "SOLD");
+
   return res
     .status(201)
     .json(new ApiResponse(201, "Add Sold Bill for customer successfully"));
@@ -664,66 +627,138 @@ const addSoldBill = asyncHandler(async (req, res) => {
 const addStitchBill = asyncHandler(async (req, res) => {
   const {
     name,
-    user_id,
-    customer_id,
-    billNumber,
     phoneNumber,
-    deliveryDate,
-    clothAmt,
-    clothes,
-    subTotal,
-    advanceAmt,
     totalAmt,
+    clothes,
+    clothAmt,
+    deliveryDate,
+    subTotal,
+    finalAmt,
+    advanceAmt,
   } = req.body;
+  // Retrive the bill number
+  const billNumber = await BillNumberCounter.findOne();
+  if (!billNumber) {
+    const newBillNumber = await BillNumberCounter.create({
+      billNumber: 1,
+    });
+    if (!newBillNumber)
+      throw new ApiError(
+        500,
+        "Something went wrong while creating bill number"
+      );
+  }
+
+  // Validation
   if (name.trim() === "") {
     throw new ApiError(400, "Name is Required");
-  } else if (user_id === undefined) {
-    throw new ApiError(400, "User Id is Required");
-  } else if (customer_id === undefined) {
-    throw new ApiError(400, "Customer Id is Required");
-  } else if (billNumber === undefined) {
-    throw new ApiError(400, "Bill Number is Required");
   } else if (phoneNumber === undefined) {
-    throw new ApiError(400, "Phone Number is Required");
-  } else if (deliveryDate === undefined) {
-    throw new ApiError(400, "Delivery Date is Required");
-  } else if (clothAmt === undefined) {
-    throw new ApiError(400, "Cloth Amount is Required");
-  } else if (clothes === undefined) {
-    throw new ApiError(400, "Clothes is Required");
-  } else if (subTotal === undefined) {
-    throw new ApiError(400, "Sub Total is Required");
-  } else if (advanceAmt === undefined) {
-    throw new ApiError(400, "Advance Amount is Required");
+    throw new ApiError(400, "Phone number is Required");
   } else if (totalAmt === undefined) {
     throw new ApiError(400, "Total Amount is Required");
+  } else if (clothes === undefined) {
+    throw new ApiError(400, "Clothes are Required");
+  } else if (deliveryDate === undefined) {
+    throw new ApiError(400, "Delivery Date is Required");
+  } else if (subTotal === undefined) {
+    throw new ApiError(400, "Sub Total is Required");
+  } else if (finalAmt === undefined) {
+    throw new ApiError(400, "Final Amount is Required");
   }
-  const newStitchBill = await StitchBillModel.create({
-    name,
-    user_id,
-    customer_id,
-    billNumber,
-    phoneNumber,
-    deliveryDate,
-    clothAmt,
-    clothes,
-    subTotal,
-    advanceAmt,
-    totalAmt,
-  });
-  if (!newStitchBill)
-    throw new ApiError(500, "Something went wrong while creating the user");
-  const customer = await CustomerModel.findById(customer_id);
-  customer.stitchedBill.push(newStitchBill._id);
-  if (!customer) throw new ApiError(404, "Customer not found");
-  await customer.save();
-  await newStitchBill.save();
+
+  // Check if the customer is already registered or not
+  const customer = await CustomerModel.findOne({ phoneNumber });
+
+  // If not registered then create a new customer
+  if (!customer) {
+    // Hash the password
+    const salt = await bcryptjs.genSalt(10);
+    const hashedPassword = await bcryptjs.hash(phoneNumber.toString(), salt);
+    if (!hashedPassword)
+      throw new ApiError(
+        500,
+        "Something went wrong while hashing the password"
+      );
+
+    // Create a new user
+    const newUser = await UserModel.create({
+      name,
+      phoneNumber,
+      role: "CUSTOMER",
+      password: hashedPassword,
+    });
+    if (!newUser)
+      throw new ApiError(500, "Something went wrong while creating the user");
+
+    // Create a new customer
+    const newCustomer = await CustomerModel.create({
+      name,
+      user_id: newUser._id,
+    });
+    if (!newCustomer) {
+      throw new ApiError(
+        500,
+        "Something went wrong while creating the customer"
+      );
+    }
+
+    const newStitchBill = await StitchBillModel.create({
+      name,
+      user_id: newUser._id,
+      customer_id: newCustomer._id,
+      phoneNumber,
+      totalAmt,
+      clothes,
+      clothAmt,
+      deliveryDate,
+      subTotal,
+      finalAmt,
+      advanceAmt,
+      billNumber: billNumber.billNumber + 1,
+    });
+    if (!newStitchBill) {
+      throw new ApiError(500, "Something went wrong adding the stictch bill");
+    }
+    await newCustomer.stitchedBill.push(newStitchBill._id);
+    await newCustomer.save();
+    await newStitchBill.save();
+    await newUser.save();
+  } else {
+    const newStitchBill = await StitchBillModel.create({
+      name,
+      user_id: newUser._id,
+      customer_id: customer._id,
+      phoneNumber,
+      totalAmt,
+      clothes,
+      clothAmt,
+      deliveryDate,
+      subTotal,
+      finalAmt,
+      advanceAmt,
+      billNumber: billNumber.billNumber + 1,
+    });
+    if (!newStitchBill)
+      throw new ApiError(500, "Something went wrong while creating the user");
+    customer.stitchedBill.push(newStitchBill._id);
+
+    await newStitchBill.save();
+    await customer.save();
+  }
+
+  // Analytics for Stitch Bill
+  analyticsAdd(finalAmt, "STITCH");
+
+  billNumber.billNumber = billNumber.billNumber + 1;
+  await billNumber.save();
+
   return res
     .status(201)
     .json(new ApiResponse(201, "Add Stitch Bill for customer successfully"));
 });
 
-// PATCH || Employee Details || AVATAR middleware needed
+// Update || PATCH
+// Employee Details || AVATAR middleware needed
 // *work and their amounts are not updated here
 const updateEmployee = asyncHandler(async (req, res) => {
   const { id } = req.params; // user id
@@ -759,7 +794,7 @@ const updateEmployee = asyncHandler(async (req, res) => {
     if (advance) helper.advance = advance;
     if (earned) helper.earned = earned;
     if (monthly) helper.monthly = monthly;
-   
+
     await helper.save();
     return res
       .status(200)
@@ -827,15 +862,140 @@ const updateEmployee = asyncHandler(async (req, res) => {
   }
 });
 
+const updateCustomer = asyncHandler(async (req, res) => {
+  const { id } = req.params; // customer id
+  const { name, phoneNumber, avatar, password } = req.body;
+  const customer = await CustomerModel.findById(id);
+  if (!customer) throw new ApiError(404, "Customer not found");
+  if (name) customer.name = name;
+  if (phoneNumber) customer.phoneNumber = phoneNumber;
+  if (avatar) {
+    const localpath = req.files?.avatar[0]?.path;
+    if (!localpath) throw new ApiError(400, "Avatar is required");
+    const newAvatar = await uploadOnCloudinary(localpath);
+    if (!newAvatar) throw new ApiError(400, "Avatar is required");
+    const user = await UserModel.findById(customer.user_id);
+    if (!user) throw new ApiError(404, "User not found");
+    user.avatar = newAvatar;
+    const unlinked = unLinkFile(localpath);
+    if (unlinked) {
+      console.log("File deleted successfully");
+    } else {
+      throw new ApiError(400, "Error in deleting the file");
+    }
+  }
+  if (password) customer.password = password;
+  await customer.save();
+  return res
+    .status(200)
+    .json(new ApiResponse(200, customer, "Customer Updated Successfully"));
+});
+
+const updateClothingItem = asyncHandler(async (req, res) => {
+  const { id } = req.params; // clothing item id
+  const { name, stitching, defaultStitchingAmt, defaultCuttingAmt } = req.body;
+  const clothingItem = await ClothingModel.findById(id);
+  if (!clothingItem) throw new ApiError(404, "Clothing Item not found");
+  if (name) clothingItem.name = name;
+  if (stitching) clothingItem.defaultStitchingAmt = stitching;
+  if (defaultStitchingAmt)
+    clothingItem.defaultStitchingAmt = defaultStitchingAmt;
+  if (defaultCuttingAmt) clothingItem.defaultCuttingAmt = defaultCuttingAmt;
+  await clothingItem.save();
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, clothingItem, "Clothing Item Updated Successfully")
+    );
+});
+
+const updateMeasurement = asyncHandler(async (req, res) => {
+  const { measurement_id } = req.params;
+  const { measurements, customerRequirements, drawing } = req.body;
+  if (measurements === undefined) {
+    throw new ApiError(400, "Measurements are Required");
+  } else if (measurement_id === undefined) {
+    throw new ApiError(400, "Measurement Id is Required");
+  }
+  const measurement = await MeasurementModel.findById(measurement_id);
+  if (!measurement) throw new ApiError(404, "Measurement not found");
+  if (measurements) measurement.measurements = measurements;
+  if (customerRequirements)
+    measurement.customerRequirements = customerRequirements;
+  if (drawing) measurement.drawing = drawing;
+  await measurement.save();
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Measurement Updated Successfully"));
+});
+
+// Retrive || GET
+const getCustomer = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { name, phoneNumber } = req.params;
+  const cust = await CustomerModel.findOne({
+    $or: [{ _id: id }, { name }, { phoneNumber }],
+  }).populate("stitchedBill purchasedBill");
+  if (!cust) throw new ApiError(404, "Customer not found");
+  const user = await UserModel.findById(cust.user_id)
+    .select("avatar phoneNumber")
+    .lean();
+  if (!user) throw new ApiError(404, "User not found");
+  const customer = {
+    _id: cust._id,
+    name: cust.name,
+    phoneNumber: user.phoneNumber,
+    avatar: user.avatar,
+    stitchedBill: cust.stitchedBill,
+    purchasedBill: cust.purchasedBill,
+  };
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, customer, "Customer Retrived Successfully"));
+});
+
+const getCustomers = asyncHandler(async (req, res) => {
+  const { page, limit } = req.query;
+  const customers = await CustomerModel.find();
+  const totalCustomers = customers.length;
+  const startIndex = (page - 1) * limit ? limit : 10;
+  const endIndex = page * limit ? limit : 10;
+  const results = {};
+  if (endIndex < totalCustomers) {
+    results.next = {
+      page: page + 1,
+      limit: limit ? limit : 10,
+    };
+  }
+  if (startIndex > 0) {
+    results.previous = {
+      page: page - 1,
+      limit: limit ? limit : 10,
+    };
+  }
+  results.totalCustomers = totalCustomers;
+  results.results = await CustomerModel.find()
+    .limit(limit ? limit : 10)
+    .skip(startIndex);
+  return res
+    .status(200)
+    .json(new ApiResponse(200, results, "Customers Retrived Successfully"));
+});
 export {
   addAdmin,
   addHelper,
   addCM,
   addTailor,
-  addCustomer,
+  // addCustomer,
   addClothingItem,
   addMeasurement,
   addSoldBill,
   addStitchBill,
   updateEmployee,
+  updateCustomer,
+  updateClothingItem,
+  updateMeasurement,
+  getCustomer,
+  getCustomers,
 };

@@ -22,9 +22,9 @@ const soldSchema = new mongoose.Schema(
       type: Number,
       required: [true, "Phone number is required"],
     },
-    clothAmt: {
+    totalAmt: {
       type: Number,
-      required: [true, "Cloth amt is required"],
+      required: [true, "Total amount is required"],
     },
     // clothes: [
     //   {
@@ -46,10 +46,6 @@ const soldSchema = new mongoose.Schema(
     //     },
     //   },
     // ],
-    totalAmt: {
-      type: Number,
-      required: [true, "Phone number is required"],
-    },
   },
   { timestamps: true }
 );

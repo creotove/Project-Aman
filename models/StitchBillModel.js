@@ -10,7 +10,7 @@ const stitchBillSchema = new mongoose.Schema(
       type: mongoose.SchemaTypes.ObjectId,
       ref: "user",
     },
-    customer_id :{
+    customer_id: {
       type: mongoose.SchemaTypes.ObjectId,
       ref: "customer",
     },
@@ -45,9 +45,9 @@ const stitchBillSchema = new mongoose.Schema(
           required: [true, "Stitching amt is required"],
         },
         totalStitchingAmt: {
-            type: Number,
-            required: [true, "Total stitching amt is required"],
-          },
+          type: Number,
+          required: [true, "Total stitching amt is required"],
+        },
       },
     ],
     subTotal: {

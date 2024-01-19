@@ -11,12 +11,20 @@ const customerSchema = new mongoose.Schema(
       ref: "user",
     },
     purchasedBill: {
-      type: mongoose.SchemaTypes.ObjectId,
-      ref: "soldBill",
+      type: [
+        {
+          type: mongoose.SchemaTypes.ObjectId,
+          ref: "soldBill",
+        },
+      ],
     },
     stitchedBill: {
-      type: mongoose.SchemaTypes.ObjectId,
-      ref: "stitchBill",
+      type: [
+        {
+          type: mongoose.SchemaTypes.ObjectId,
+          ref: "stitchBill",
+        },
+      ],
     },
     measurements: {
       type: mongoose.SchemaTypes.ObjectId,
