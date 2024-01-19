@@ -549,12 +549,15 @@ const addMeasurement = asyncHandler(async (req, res) => {
 
 const addSoldBill = asyncHandler(async (req, res) => {
   const { name, phoneNumber, totalAmt } = req.body;
-  [name, phoneNumber, totalAmt].some((field) => {
-    if (field === undefined) {
-      throw new ApiError(400, `${field} is Required`);
-    }
-  });
-  const customer = await CustomerModel.findOne({ phoneNumber });
+  if (name.trim() === "") {
+    throw new ApiError(400, "Name is Required");
+  } else if (phoneNumber === undefined) {
+    throw new ApiError(400, "Phone number is Required");
+  } else if (totalAmt === undefined) {
+    throw new ApiError(400, "Total Amount is Required");
+  }
+
+  const user = await UserModel.findOne({ phoneNumber });
   const billNumber = await BillNumberCounter.findOne();
   if (!billNumber) {
     const newBillNumber = await BillNumberCounter.create({
@@ -567,7 +570,7 @@ const addSoldBill = asyncHandler(async (req, res) => {
       );
     await newBillNumber.save();
   }
-  if (!customer) {
+  if (!user) {
     const salt = await bcryptjs.genSalt(10);
     const hashedPassword = await bcryptjs.hash(phoneNumber.toString(), salt);
 
@@ -584,7 +587,10 @@ const addSoldBill = asyncHandler(async (req, res) => {
       user_id: newUser._id,
     });
     if (!newCustomer)
-      throw new ApiError(500, "Something went wrong while creating the user");
+      throw new ApiError(
+        500,
+        "Something went wrong while creating the customer"
+      );
     await newUser.save();
     const newSoldBill = await SoldBillModel.create({
       name,
@@ -602,8 +608,8 @@ const addSoldBill = asyncHandler(async (req, res) => {
   } else {
     const newSoldBill = await SoldBillModel.create({
       name,
-      user_id: customer.user_id,
-      customer_id: customer._id,
+      user_id: user.user_id,
+      user_id: user._id,
       phoneNumber,
       totalAmt,
       billNumber: billNumber.billNumber + 1,
@@ -611,9 +617,15 @@ const addSoldBill = asyncHandler(async (req, res) => {
     if (!newSoldBill)
       throw new ApiError(500, "Something went wrong while creating the user");
     billNumber.billNumber = billNumber.billNumber + 1;
+    const customer = await CustomerModel.findOne({ user_id: user._id });
+    if (!customer)
+      throw new ApiError(500, "Something went wrong while creating the user");
+    customer.purchasedBill.push(newSoldBill._id);
+
+    await customer.save();
     await billNumber.save();
     await newSoldBill.save();
-    await customer.save();
+    await user.save();
   }
 
   // Analytics for Stitch Bill
@@ -621,7 +633,7 @@ const addSoldBill = asyncHandler(async (req, res) => {
 
   return res
     .status(201)
-    .json(new ApiResponse(201, "Add Sold Bill for customer successfully"));
+    .json(new ApiResponse(201, "Add Sold Bill for user successfully"));
 });
 
 const addStitchBill = asyncHandler(async (req, res) => {
@@ -667,10 +679,10 @@ const addStitchBill = asyncHandler(async (req, res) => {
   }
 
   // Check if the customer is already registered or not
-  const customer = await CustomerModel.findOne({ phoneNumber });
+  const user = await UserModel.findOne({ phoneNumber });
 
   // If not registered then create a new customer
-  if (!customer) {
+  if (!user) {
     // Hash the password
     const salt = await bcryptjs.genSalt(10);
     const hashedPassword = await bcryptjs.hash(phoneNumber.toString(), salt);
@@ -719,14 +731,18 @@ const addStitchBill = asyncHandler(async (req, res) => {
     if (!newStitchBill) {
       throw new ApiError(500, "Something went wrong adding the stictch bill");
     }
-    await newCustomer.stitchedBill.push(newStitchBill._id);
+    newCustomer.stitchedBill.push(newStitchBill._id);
     await newCustomer.save();
     await newStitchBill.save();
     await newUser.save();
   } else {
+    const customer = await CustomerModel.findOne({ user_id: user._id });
+    if (!customer)
+      throw new ApiError(500, "Something went wrong while creating the user");
+
     const newStitchBill = await StitchBillModel.create({
       name,
-      user_id: newUser._id,
+      user_id: user._id,
       customer_id: customer._id,
       phoneNumber,
       totalAmt,
