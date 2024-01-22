@@ -16,9 +16,42 @@ import CustomerModel from "../models/CustomerModel.js";
 import MeasurementHistoryModel from "../models/MeasurementHistoryModel.js";
 import SoldBillModel from "../models/SoldBillModel.js";
 import StitchBillModel from "../models/StitchBillModel.js";
-import { analyticsAdd } from "../utils/analyticsAdd.js";
 import BillNumberCounter from "../models/BillNumberCounter.js";
+import { analyticsAdd } from "../utils/analyticsAdd.js";
+import mongoose from "mongoose";
 
+// Utility function for pagination
+function paginatedData(Model) {
+  return async (req, res) => {
+    const page = parseInt(req.query.page);
+    const limit = parseInt(req.query.limit);
+    const startIndex = (page - 1) * limit;
+    const endIndex = page * limit;
+    const results = {};
+    try {
+      if (endIndex < (await Model.countDocuments().exec())) {
+        results.next = {
+          page: page + 1,
+          limit: limit,
+        };
+      }
+      if (startIndex > 0) {
+        results.previous = {
+          page: page - 1,
+          limit: limit,
+        };
+      }
+      results.results = await Model.find()
+        .sort({ createdAt: 1 })
+        .limit(limit)
+        .skip(startIndex)
+        .exec();
+      res.paginatedResults = results;
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  };
+}
 // Steps to create Customer & Employee
 // 1. Extract the values from the body
 // 2. Check the fields if they are empty then throw error
@@ -103,7 +136,7 @@ const addAdmin = asyncHandler(async (req, res) => {
 
 const addHelper = asyncHandler(async (req, res) => {
   // Step 1
-  const { name, phoneNumber, monthly } = req.body;
+  const { name, phoneNumber, monthly, aadharnumber } = req.body;
   console.log(req.body);
 
   // Step 2
@@ -113,6 +146,8 @@ const addHelper = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Phone number is Required");
   } else if (monthly === undefined) {
     throw new ApiError(400, "Phone number is Required");
+  } else if (aadharnumber === undefined) {
+    throw new ApiError(400, "Aadhar number is Required");
   }
 
   // Step 3
@@ -148,6 +183,7 @@ const addHelper = asyncHandler(async (req, res) => {
     phoneNumber,
     avatar: avatar.url,
     role: "HELPER",
+    aadharnumber,
   });
   // Step 8
   if (!newUser)
@@ -187,13 +223,15 @@ const addHelper = asyncHandler(async (req, res) => {
 
 const addCM = asyncHandler(async (req, res) => {
   // Step 1
-  const { name, phoneNumber } = req.body;
+  const { name, phoneNumber, aadharnumber } = req.body;
 
   // Step 2
   if (name.trim() === "") {
     throw new ApiError(400, "Name is Required");
   } else if (phoneNumber === undefined) {
     throw new ApiError(400, "Phone number is Required");
+  } else if (aadharnumber === undefined) {
+    throw new ApiError(400, "Aadhar number is Required");
   }
 
   // Step 3
@@ -229,6 +267,7 @@ const addCM = asyncHandler(async (req, res) => {
     phoneNumber,
     avatar: avatar.url,
     role: "CUTTING MASTER",
+    aadharnumber,
   });
 
   // Step 8
@@ -281,13 +320,15 @@ const addCM = asyncHandler(async (req, res) => {
 
 const addTailor = asyncHandler(async (req, res) => {
   // Step 1
-  const { name, phoneNumber } = req.body;
+  const { name, phoneNumber, aadharnumber } = req.body;
 
   // Step 2
   if (name.trim() === "") {
     throw new ApiError(400, "Name is Required");
   } else if (phoneNumber === undefined) {
     throw new ApiError(400, "Phone number is Required");
+  } else if (aadharnumber === undefined) {
+    throw new ApiError(400, "Aadhar number is Required");
   }
 
   // Step 3
@@ -323,6 +364,7 @@ const addTailor = asyncHandler(async (req, res) => {
     phoneNumber,
     avatar: avatar.url,
     role: "CUTTING MASTER",
+    aadharnumber,
   });
 
   // Step 8
@@ -972,31 +1014,432 @@ const getCustomer = asyncHandler(async (req, res) => {
 });
 
 const getCustomers = asyncHandler(async (req, res) => {
-  const { page, limit } = req.query;
-  const customers = await CustomerModel.find();
-  const totalCustomers = customers.length;
-  const startIndex = (page - 1) * limit ? limit : 10;
-  const endIndex = page * limit ? limit : 10;
-  const results = {};
-  if (endIndex < totalCustomers) {
-    results.next = {
-      page: page + 1,
-      limit: limit ? limit : 10,
-    };
-  }
-  if (startIndex > 0) {
-    results.previous = {
-      page: page - 1,
-      limit: limit ? limit : 10,
-    };
-  }
-  results.totalCustomers = totalCustomers;
-  results.results = await CustomerModel.find()
-    .limit(limit ? limit : 10)
-    .skip(startIndex);
+  // const { page, limit } = req.query;
+  // const customers = await CustomerModel.find();
+  // const totalCustomers = customers.length;
+  // const startIndex = (page - 1) * limit ? limit : 10;
+  // const endIndex = page * limit ? limit : 10;
+  // const results = {};
+  // if (endIndex < totalCustomers) {
+  //   results.next = {
+  //     page: page + 1,
+  //     limit: limit ? limit : 10,
+  //   };
+  // }
+  // if (startIndex > 0) {
+  //   results.previous = {
+  //     page: page - 1,
+  //     limit: limit ? limit : 10,
+  //   };
+  // }
+  // results.totalCustomers = totalCustomers;
+  // results.results = await CustomerModel.find()
+  //   .sort({ createdAt: -1 })
+  //   .limit(limit ? limit : 10)
+  //   .skip(startIndex);
+  await paginatedData(CustomerModel)(req, res);
+  console.log(res.paginatedResults);
   return res
     .status(200)
-    .json(new ApiResponse(200, results, "Customers Retrived Successfully"));
+    .json(
+      new ApiResponse(
+        200,
+        res.paginatedResults,
+        "Customers Retrived Successfully"
+      )
+    );
+});
+
+const getEmployee = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { name, phoneNumber } = req.params;
+  const user = await UserModel.findOne({
+    $or: [{ _id: id }, { name }, { phoneNumber }],
+  }).select("-password -refreshToken");
+  if (!user) throw new ApiError(404, "User not found");
+  if (user.role === "HELPER") {
+    const helper = await HelperModel.findOne({ user_id: user._id });
+    if (!helper) throw new ApiError(404, "Helper not found");
+    return res
+      .status(200)
+      .json(new ApiResponse(200, helper, "Helper Retrived Successfully"));
+  }
+  if (user.role === "CUTTING MASTER") {
+    const cuttingMaster = await CuttingMasterModel.findOne({
+      user_id: user._id,
+    });
+    if (!cuttingMaster) throw new ApiError(404, "Cutting Master not found");
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          cuttingMaster,
+          "Cutting Master Retrived Successfully"
+        )
+      );
+  }
+  if (user.role === "TAILOR") {
+    const tailor = await TailorModel.findOne({ user_id: user._id });
+    if (!tailor) throw new ApiError(404, "Tailor not found");
+    return res
+      .status(200)
+      .json(new ApiResponse(200, tailor, "Tailor Retrived Successfully"));
+  }
+});
+
+const getEmployees = asyncHandler(async (req, res) => {
+  const { employeeType } = req.query;
+  if (!employeeType) {
+    const { page, limit } = req.query;
+    const employees = await UserModel.find({
+      role: { $ne: "CUSTOMER" },
+    }).select("-password -refreshToken");
+    const totalEmployees = employees.length;
+    const startIndex = (page - 1) * limit ? limit : 10;
+    const endIndex = page * limit ? limit : 10;
+    const results = {};
+    if (endIndex < totalEmployees) {
+      results.next = {
+        page: page + 1,
+        limit: limit ? limit : 10,
+      };
+    }
+    if (startIndex > 0) {
+      results.previous = {
+        page: page - 1,
+        limit: limit ? limit : 10,
+      };
+    }
+    results.totalEmployees = totalEmployees;
+    results.results = await UserModel.find({ role: { $ne: "CUSTOMER" } })
+      .sort({ createdAt: -1 })
+      .limit(limit ? limit : 10)
+      .skip(startIndex);
+    return res
+      .status(200)
+      .json(new ApiResponse(200, results, "Employees Retrived Successfully"));
+  }
+  if (employeeType === "HELPER") {
+    await paginatedData(HelperModel)(req, res);
+  } else if (employeeType === "CUTTING MASTER") {
+    await paginatedData(CuttingMasterModel)(req, res);
+  } else if (employeeType === "TAILOR") {
+    await paginatedData(TailorModel)(req, res);
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        res.paginatedResults,
+        "Employees Retrived Successfully"
+      )
+    );
+});
+
+const getCustomerProfile = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  if (id === undefined) {
+    throw new ApiError(404, "Id is required to fetch the customer");
+  }
+  const customer = await CustomerModel.aggregate([
+    // Finding the customer
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(id),
+      },
+    },
+    // Getting the customer avatar from user collection
+    {
+      $lookup: {
+        from: "users",
+        localField: "user_id",
+        foreignField: "_id",
+        as: "userDetails",
+        pipeline: [
+          {
+            $project: {
+              _id: 0,
+              avatar: 1,
+            },
+          },
+        ],
+      },
+    },
+    // Adding new fields stitched bill, purchased bill count and the fetched avatar(So that frnt end dev can directly use it)
+    {
+      $addFields: {
+        stitchedBillCount: {
+          $size: "$stitchedBill",
+        },
+        purchasedBillCount: {
+          $size: "$purchasedBill",
+        },
+        avatar: {
+          $arrayElemAt: ["$userDetails.avatar", 0],
+        },
+      },
+    },
+    // Removing the user details from the response as the avatar was previously addedd to the response directly
+    {
+      $project: {
+        userDetails: 0,
+      },
+    },
+    // Fetching the customer stitched bill details
+    {
+      $lookup: {
+        from: "stitchbills",
+        localField: "stitchedBill",
+        foreignField: "_id",
+        as: "stitchedBillDetails",
+        // Adding Extra field of bill type to differentiate between the stitched and purchased bill
+        pipeline: [
+          {
+            $addFields: {
+              billType: "Stitched",
+            },
+          },
+          {
+            $project: {
+              finalAmt: 1,
+              createdAt: 1,
+              billType: 1,
+            },
+          },
+        ],
+      },
+    },
+    // Fetching the customer purchased bill details
+    {
+      $lookup: {
+        from: "soldbills",
+        localField: "purchasedBill",
+        foreignField: "_id",
+        as: "purchasedBillDetails",
+        // Adding Extra field of bill type to differentiate between the stitched and purchased bill
+        pipeline: [
+          {
+            $addFields: {
+              billType: "Purchased",
+            },
+          },
+          {
+            $project: {
+              totalAmt: 1,
+              createdAt: 1,
+              billType: 1,
+            },
+          },
+        ],
+      },
+    },
+    // Merging the stitched and purchased bill details into a single array and sorting them by the createdAt field
+    {
+      $addFields: {
+        recentBill: {
+          $cond: {
+            if: {
+              $gt: [
+                "$stitchedBillDetails.createdAt",
+                "$purchasedBillDetails.createdAt",
+              ],
+            },
+            then: "$stitchedBillDetails",
+            else: "$purchasedBillDetails",
+          },
+        },
+      },
+    },
+    // Fetching the customer measurements
+    {
+      $lookup: {
+        from: "measurements",
+        localField: "_id",
+        foreignField: "customer_id",
+        as: "measurements",
+        pipeline: [
+          {
+            $project: {
+              _id: 0,
+              name: 1,
+              measurements: 1,
+            },
+          },
+        ],
+      },
+    },
+    // Removing the unwanted fields from the final response
+    {
+      $project: {
+        stitchedBill: 0,
+        purchasedBill: 0,
+        stitchedBillDetails: 0,
+        purchasedBillDetails: 0,
+        updatedAt: 0,
+        createdAt: 0,
+        __v: 0,
+      },
+    },
+  ]);
+  if (!customer) throw new ApiError(404, "Customer not found");
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, customer[0], "Customer fetched successfully try")
+    );
+});
+
+const getCustomerBills = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const limit = parseInt(req.query.limit) || 10; // pageSize
+  const page = parseInt(req.query.page) || 1; // pageNumber
+  if (id === undefined) {
+    throw new ApiError(404, "Id is required to fetch the customer");
+  }
+  const customer = await CustomerModel.aggregate([
+    // Finding the customer
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(id),
+      },
+    },
+    // Getting the customer avatar from user collection
+    {
+      $lookup: {
+        from: "users",
+        localField: "user_id",
+        foreignField: "_id",
+        as: "userDetails",
+        pipeline: [
+          {
+            $project: {
+              _id: 0,
+              avatar: 1,
+              phoneNumber: 1,
+            },
+          },
+        ],
+      },
+    },
+    // Adding new field avatar(So that frnt end dev can directly use it)
+    {
+      $addFields: {
+        avatar: {
+          $arrayElemAt: ["$userDetails.avatar", 0],
+        },
+        phoneNumber: {
+          $arrayElemAt: ["$userDetails.phoneNumber", 0],
+        },
+      },
+    },
+    // Removing the user details from the response as the avatar was previously addedd to the response directly
+    {
+      $project: {
+        userDetails: 0,
+      },
+    },
+    // Fetching the customer stitched bill details
+    {
+      $lookup: {
+        from: "stitchbills",
+        localField: "stitchedBill",
+        foreignField: "_id",
+        as: "stitchedBillDetails",
+        // Adding Extra field of bill type to differentiate between the stitched and purchased bill
+        pipeline: [
+          {
+            $addFields: {
+              billType: "Stitched",
+            },
+          },
+          {
+            $project: {
+              finalAmt: 1,
+              createdAt: 1,
+              billType: 1,
+            },
+          },
+        ],
+      },
+    },
+    // Fetching the customer purchased bill details
+    {
+      $lookup: {
+        from: "soldbills",
+        localField: "purchasedBill",
+        foreignField: "_id",
+        as: "purchasedBillDetails",
+        // Adding Extra field of bill type to differentiate between the stitched and purchased bill
+        pipeline: [
+          {
+            $addFields: {
+              billType: "PURCHASED",
+            },
+          },
+          {
+            $project: {
+              totalAmt: 1,
+              createdAt: 1,
+              billType: 1,
+            },
+          },
+        ],
+      },
+    },
+    // Merging the stitched and purchased bill details into a single array and sorting them by the createdAt field
+    {
+      $addFields: {
+        recentBill: {
+          $cond: {
+            if: {
+              $gt: [
+                "$stitchedBillDetails.createdAt",
+                "$purchasedBillDetails.createdAt",
+              ],
+            },
+            then: "$stitchedBillDetails",
+            else: "$purchasedBillDetails",
+          },
+        },
+      },
+    },
+    // Projecting the required fields
+    {
+      $project: {
+        stitchedBill: 0,
+        purchasedBill: 0,
+        stitchedBillDetails: 0,
+        purchasedBillDetails: 0,
+        updatedAt: 0,
+        createdAt: 0,
+        __v: 0,
+      },
+    },
+    // pagination
+    {
+      $addFields: {
+        total: { $size: "$recentBill" },
+        page,
+        limit,
+        recentBill: {
+          $slice: [
+            "$recentBill",
+            { $add: [{ $multiply: [page, limit] }, -limit] },
+            limit,
+          ],
+        },
+      },
+    },
+  ]);
+  if (!customer) throw new ApiError(404, "Customer not found");
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, customer[0], "Customer bills fetched successfull")
+    );
 });
 export {
   addAdmin,
@@ -1013,5 +1456,9 @@ export {
   updateClothingItem,
   updateMeasurement,
   getCustomer,
+  getCustomerProfile,
   getCustomers,
+  getEmployee,
+  getEmployees,
+  getCustomerBills,
 };

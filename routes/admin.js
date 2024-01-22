@@ -13,6 +13,10 @@ import {
   updateCustomer,
   getCustomers,
   getCustomer,
+  getEmployee,
+  getEmployees,
+  getCustomerProfile,
+  getCustomerBills,
 } from "../controllers/adminCtrls.js";
 import { upload } from "../middlewares/multer.js";
 const router = express.Router();
@@ -123,6 +127,10 @@ router.patch(
 ); // -> /api/admin/updateCustomer/:id
 
 // GET || Read
-router.get('/customers',getCustomers) // -> /api/admin/customers
-router.get("/customer/:id", getCustomer); // -> /api/admin/customer/:id
+router.get("/customers", getCustomers); // -> /api/admin/customers
+router.get("/customer/:id", getCustomerProfile); // -> /api/admin/customer/:id
+router.get("/bills/:id", getCustomerBills); // -> /api/admin/bills/:id
+router.get("/employees", getEmployees); // -> /api/admin/employees
+router.get("/employee/:id", getEmployee); // -> /api/admin/employees/:id
+
 export default router;

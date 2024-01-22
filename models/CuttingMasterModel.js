@@ -26,6 +26,10 @@ const cuttingMasterSchema = new mongoose.Schema({
     of: Number,
     default: {},
   },
+  aadharnumber: {
+    type: Number,
+    required: [true, "Aadhar number is required"],
+  },
   work: [
     {
       cloth: {

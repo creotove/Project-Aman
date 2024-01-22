@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-
 const stitchBillSchema = new mongoose.Schema(
   {
     name: {

@@ -21,6 +21,10 @@ const tailorSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  aadharnumber: {
+    type: Number,
+    required: [true, "Aadhar number is required"],
+  },
   stitchingAmounts: {
     type: Map,
     of: Number,
