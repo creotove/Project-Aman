@@ -1,8 +1,125 @@
 import AnalyticsModel from "../models/AnalyticsModel.js";
 import { ApiError } from "./ApiError.js";
 
-export const analyticsAdd = async (totalAmt, billType) => {
+export const analyticsAdd = async (totalAmt, billType, customerType) => {
   try {
+    const amountToadd = parseInt(totalAmt);
+    const analytics = await AnalyticsModel.findOne({
+      year: new Date().getFullYear(),
+    });
+    if (!analytics) {
+      const newAnalytics = new AnalyticsModel({
+        year: new Date().getFullYear(),
+        income: amountToadd,
+        salary: 0,
+        profit: amountToadd,
+        customers: customerType === "NEW" ? 1 : 0,
+        newCustomers: customerType === "NEW" ? 1 : 0,
+        sales: billType === "STITCHED" ? 0 : amountToadd,
+        salesBillCount: billType === "STITCHED" ? 0 : 1,
+        stitch: billType === "STITCHED" ? amountToadd : 0,
+        stitchBillCount: billType === "STITCHED" ? 1 : 0,
+        monthlyData: [
+          {
+            month: new Date()
+              .toLocaleString("default", { month: "long" })
+              .slice(0, 3),
+            income: amountToadd,
+            salary: 0,
+            profit: amountToadd,
+            customers: customerType === "NEW" ? 1 : 0,
+            newCustomers: customerType === "NEW" ? 1 : 0,
+            sales: billType === "STITCHED" ? 0 : amountToadd,
+            salesBillCount: billType === "STITCHED" ? 0 : 1,
+            stitch: billType === "STITCHED" ? amountToadd : 0,
+            stitchBillCount: billType === "STITCHED" ? 1 : 0,
+          },
+        ],
+        dailyData: [
+          {
+            date: new Date().toLocaleString("default", {
+              day: "numeric",
+              month: "numeric",
+              year: "numeric",
+            }),
+            income: amountToadd,
+            salary: 0,
+            profit: amountToadd,
+            customers: customerType === "NEW" ? 1 : 0,
+            newCustomers: customerType === "NEW" ? 1 : 0,
+            sales: billType === "STITCHED" ? 0 : amountToadd,
+            salesBillCount: billType === "STITCHED" ? 0 : 1,
+            stitch: billType === "STITCHED" ? amountToadd : 0,
+            stitchBillCount: billType === "STITCHED" ? 1 : 0,
+          },
+        ],
+      });
+      await newAnalytics.save();
+    } else {
+      analytics.income += amountToadd;
+      analytics.profit += amountToadd;
+      analytics.customers += customerType === "NEW" ? 1 : 0;
+      analytics.newCustomers += customerType === "NEW" ? 1 : 0;
+      const month = new Date()
+        .toLocaleString("default", { month: "long" })
+        .slice(0, 3);
+      const day = new Date().toLocaleString("default", { day: "numeric" });
+      const date = `${month}-${day}`;
+      const monthIndex = analytics.monthlyData.findIndex(
+        (item) => item.month === month
+      );
+      const dayIndex = analytics.dailyData.findIndex(
+        (item) => item.date === date
+      );
+      if (monthIndex !== -1) {
+        analytics.monthlyData[monthIndex].income += amountToadd;
+        analytics.monthlyData[monthIndex].profit += amountToadd;
+        analytics.monthlyData[monthIndex].customers +=
+          customerType === "NEW" ? 1 : 0;
+        analytics.monthlyData[monthIndex].newCustomers +=
+          customerType === "NEW" ? 1 : 0;
+      } else {
+        analytics.monthlyData.push({
+          month: month,
+          income: amountToadd,
+          profit: amountToadd,
+          customers: customerType === "NEW" ? 1 : 0,
+          newCustomers: customerType === "NEW" ? 1 : 0,
+          sales: 0,
+          salesBillCount: 0,
+          stitch: 0,
+          stitchBillCount: 0,
+        });
+      }
+      if (dayIndex !== -1) {
+        analytics.dailyData[dayIndex].income += amountToadd;
+        analytics.dailyData[dayIndex].profit += amountToadd;
+        analytics.dailyData[dayIndex].customers +=
+          customerType === "NEW" ? 1 : 0;
+        analytics.dailyData[dayIndex].newCustomers +=
+          customerType === "NEW" ? 1 : 0;
+      } else {
+        analytics.dailyData.push({
+          date: date,
+          income: amountToadd,
+          profit: amountToadd,
+          customers: customerType === "NEW" ? 1 : 0,
+          newCustomers: customerType === "NEW" ? 1 : 0,
+          sales: 0,
+          salesBillCount: 0,
+          stitch: 0,
+          stitchBillCount: 0,
+        });
+      }
+      await analytics.save();
+    }
+  } catch (error) {
+    throw new ApiError(500, error.message);
+  }
+};
+
+/* 
+try {
     const totalAmount = parseInt(totalAmt);
     const analytics = await AnalyticsModel.findOne({
       year: new Date().getFullYear(),
@@ -165,74 +282,5 @@ export const analyticsAdd = async (totalAmt, billType) => {
       }
     }
     await analytics.save();
-  } catch (error) {
-    throw new ApiError(500, error.message);
-  }
-};
-
-// const totalAmount = parseInt(totalAmt);
-//     console.log(totalAmount);
-//     const analytics = await AnalyticsModel.findOne({
-//       year: new Date().getFullYear(),
-//     });
-//     if (analytics) {
-//       analytics.totalCustomers += 1;
-//       analytics.totalSales += totalAmount;
-//       if (billType === "STITCH") analytics.yearlyStitchQty += 1;
-//       else if(billType === "SOLD")analytics.yearlySoldQty += 1;
-//       const month = new Date().toLocaleString("default", { month: "long" });
-//       const day = new Date().toLocaleString("default", { day: "numeric" });
-//       const date = `${month} ${day}`;
-//       const monthIndex = analytics.monthlyData.findIndex(
-//         (item) => item.month === month
-//       );
-//       const dayIndex = analytics.dailyData.findIndex(
-//         (item) => item.date === date
-//       );
-//       if (monthIndex !== -1) {
-//         analytics.monthlyData[monthIndex].totalSales += totalAmount;
-//         analytics.monthlyData[monthIndex].totalStitch += 1;
-//       } else {
-//         analytics.monthlyData.push({
-//           month: month,
-//           totalSales: totalAmount,
-//           totalStitch: 1,
-//         });
-//       }
-//       if (dayIndex !== -1) {
-//         analytics.dailyData[dayIndex].totalSales += totalAmount;
-//         analytics.dailyData[dayIndex].totalUnits += 1;
-//       } else {
-//         analytics.dailyData.push({
-//           date: date,
-//           totalSales: totalAmount,
-//           totalStitch: 1,
-//         });
-//       }
-//       await analytics.save();
-//     }else{
-//       const analytics = new AnalyticsModel({
-//         year: new Date().getFullYear(),
-//         totalCustomers: 1,
-//         totalSales: totalAmount,
-//         yearlyStitchTotal: billType === "STITCH" ? 1 : 0,
-//         yearlySoldTotal: billType === "SOLD" ? 1 : 0,
-//         monthlyData: [
-//           {
-//             month: new Date().toLocaleString("default", { month: "long" }),
-//             totalSales: totalAmount,
-//             totalUnits: 1,
-//           },
-//         ],
-//         dailyData: [
-//           {
-//             date: `${new Date().toLocaleString("default", {
-//               month: "long",
-//             })} ${new Date().toLocaleString("default", { day: "numeric" })}`,
-//             totalSales: totalAmount,
-//             totalUnits: 1,
-//           },
-//         ],
-//       });
-//       await analytics.save();
-//     }
+  } 
+*/

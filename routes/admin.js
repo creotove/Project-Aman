@@ -17,8 +17,10 @@ import {
   getEmployees,
   getCustomerProfile,
   getCustomerBills,
+  getAnalytics,
 } from "../controllers/adminCtrls.js";
 import { upload } from "../middlewares/multer.js";
+import { addBillNumber } from "../middlewares/billNumber.js";
 const router = express.Router();
 
 // POST || Creation
@@ -99,9 +101,9 @@ router.post(
   addMeasurement
 ); // -> /api/admin/addMeasurement
 
-router.post("/addStitchBill", addStitchBill); // -> /api/admin/addStitchBill
+router.post("/addStitchBill", addBillNumber, addStitchBill); // -> /api/admin/addStitchBill
 
-router.post("/addSoldBill", addSoldBill); // -> /api/admin/addSoldBill
+router.post("/addSoldBill", addBillNumber, addSoldBill); // -> /api/admin/addSoldBill
 
 // PATCH || Update
 router.patch(
@@ -132,5 +134,6 @@ router.get("/customer/:id", getCustomerProfile); // -> /api/admin/customer/:id
 router.get("/bills/:id", getCustomerBills); // -> /api/admin/bills/:id
 router.get("/employees", getEmployees); // -> /api/admin/employees
 router.get("/employee/:id", getEmployee); // -> /api/admin/employees/:id
+router.get("/analytics", getAnalytics); // -> /api/admin/analytics
 
 export default router;

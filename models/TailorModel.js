@@ -32,6 +32,10 @@ const tailorSchema = new mongoose.Schema({
   },
   work: [
     {
+      date: {
+        type: Date,
+        required: [true, "Date is required"],
+      },
       cloth: {
         type: String,
         required: [true, "Cloth stitched work name is required"],

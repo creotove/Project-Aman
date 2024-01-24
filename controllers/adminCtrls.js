@@ -19,6 +19,7 @@ import StitchBillModel from "../models/StitchBillModel.js";
 import BillNumberCounter from "../models/BillNumberCounter.js";
 import { analyticsAdd } from "../utils/analyticsAdd.js";
 import mongoose from "mongoose";
+import AnalyticsModel from "../models/AnalyticsModel.js";
 
 // Utility function for pagination
 function paginatedData(Model) {
@@ -590,7 +591,7 @@ const addMeasurement = asyncHandler(async (req, res) => {
 });
 
 const addSoldBill = asyncHandler(async (req, res) => {
-  const { name, phoneNumber, totalAmt } = req.body;
+  const { name, phoneNumber, totalAmt, billNumber } = req.body;
   if (name.trim() === "") {
     throw new ApiError(400, "Name is Required");
   } else if (phoneNumber === undefined) {
@@ -600,18 +601,6 @@ const addSoldBill = asyncHandler(async (req, res) => {
   }
 
   const user = await UserModel.findOne({ phoneNumber });
-  const billNumber = await BillNumberCounter.findOne();
-  if (!billNumber) {
-    const newBillNumber = await BillNumberCounter.create({
-      billNumber: 1,
-    });
-    if (!newBillNumber)
-      throw new ApiError(
-        500,
-        "Something went wrong while creating bill number"
-      );
-    await newBillNumber.save();
-  }
   if (!user) {
     const salt = await bcryptjs.genSalt(10);
     const hashedPassword = await bcryptjs.hash(phoneNumber.toString(), salt);
@@ -654,24 +643,26 @@ const addSoldBill = asyncHandler(async (req, res) => {
       user_id: user._id,
       phoneNumber,
       totalAmt,
-      billNumber: billNumber.billNumber + 1,
+      billNumber,
     });
     if (!newSoldBill)
       throw new ApiError(500, "Something went wrong while creating the user");
-    billNumber.billNumber = billNumber.billNumber + 1;
     const customer = await CustomerModel.findOne({ user_id: user._id });
     if (!customer)
       throw new ApiError(500, "Something went wrong while creating the user");
     customer.purchasedBill.push(newSoldBill._id);
 
     await customer.save();
-    await billNumber.save();
     await newSoldBill.save();
     await user.save();
   }
 
   // Analytics for Stitch Bill
-  analyticsAdd(totalAmt, "SOLD");
+  if (!user) {
+    analyticsAdd(totalAmt, "SOLD", "NEW");
+  } else {
+    analyticsAdd(totalAmt, "SOLD", "RETURNING");
+  }
 
   return res
     .status(201)
@@ -689,20 +680,8 @@ const addStitchBill = asyncHandler(async (req, res) => {
     subTotal,
     finalAmt,
     advanceAmt,
+    billNumber,
   } = req.body;
-  // Retrive the bill number
-  const billNumber = await BillNumberCounter.findOne();
-  if (!billNumber) {
-    const newBillNumber = await BillNumberCounter.create({
-      billNumber: 1,
-    });
-    if (!newBillNumber)
-      throw new ApiError(
-        500,
-        "Something went wrong while creating bill number"
-      );
-  }
-
   // Validation
   if (name.trim() === "") {
     throw new ApiError(400, "Name is Required");
@@ -768,7 +747,7 @@ const addStitchBill = asyncHandler(async (req, res) => {
       subTotal,
       finalAmt,
       advanceAmt,
-      billNumber: billNumber.billNumber + 1,
+      billNumber,
     });
     if (!newStitchBill) {
       throw new ApiError(500, "Something went wrong adding the stictch bill");
@@ -794,7 +773,7 @@ const addStitchBill = asyncHandler(async (req, res) => {
       subTotal,
       finalAmt,
       advanceAmt,
-      billNumber: billNumber.billNumber + 1,
+      billNumber,
     });
     if (!newStitchBill)
       throw new ApiError(500, "Something went wrong while creating the user");
@@ -805,10 +784,11 @@ const addStitchBill = asyncHandler(async (req, res) => {
   }
 
   // Analytics for Stitch Bill
-  analyticsAdd(finalAmt, "STITCH");
-
-  billNumber.billNumber = billNumber.billNumber + 1;
-  await billNumber.save();
+  if (!user) {
+    analyticsAdd(finalAmt, "STITCH", "NEW");
+  } else {
+    analyticsAdd(finalAmt, "STITCH", "RETURNING");
+  }
 
   return res
     .status(201)
@@ -1141,6 +1121,8 @@ const getEmployees = asyncHandler(async (req, res) => {
 
 const getCustomerProfile = asyncHandler(async (req, res) => {
   const { id } = req.params;
+  const limit = parseInt(req.query.limit) || 10; // pageSize
+  const page = parseInt(req.query.page) || 1; // pageNumber
   if (id === undefined) {
     throw new ApiError(404, "Id is required to fetch the customer");
   }
@@ -1236,21 +1218,33 @@ const getCustomerProfile = asyncHandler(async (req, res) => {
         ],
       },
     },
-    // Merging the stitched and purchased bill details into a single array and sorting them by the createdAt field
+    // Merging the stitched and purchased bill details into a single
     {
       $addFields: {
         recentBill: {
-          $cond: {
-            if: {
-              $gt: [
-                "$stitchedBillDetails.createdAt",
-                "$purchasedBillDetails.createdAt",
-              ],
-            },
-            then: "$stitchedBillDetails",
-            else: "$purchasedBillDetails",
-          },
+          $concatArrays: ["$stitchedBillDetails", "$purchasedBillDetails"],
         },
+      },
+    },
+    // Sorting the recent bill by the createdAt field
+    {
+      $unwind: "$recentBill",
+    },
+    {
+      $sort: {
+        "recentBill.createdAt": -1,
+      },
+    },
+    {
+      $group: {
+        _id: "$_id",
+        name: { $first: "$name" },
+        user_id: { $first: "$user_id" },
+        stitchedBillCount: { $first: "$stitchedBillCount" },
+        purchasedBillCount: { $first: "$purchasedBillCount" },
+        avatar: { $first: "$avatar" },
+        measurements: { $first: "$measurements" },
+        recentBill: { $push: "$recentBill" }, // Push all sorted recentBill documents into an array
       },
     },
     // Fetching the customer measurements
@@ -1281,6 +1275,21 @@ const getCustomerProfile = asyncHandler(async (req, res) => {
         updatedAt: 0,
         createdAt: 0,
         __v: 0,
+      },
+    },
+    // pagination
+    {
+      $addFields: {
+        total: { $size: "$recentBill" },
+        page,
+        limit,
+        recentBill: {
+          $slice: [
+            "$recentBill",
+            { $add: [{ $multiply: [page, limit] }, -limit] },
+            limit,
+          ],
+        },
       },
     },
   ]);
@@ -1441,16 +1450,72 @@ const getCustomerBills = asyncHandler(async (req, res) => {
       new ApiResponse(200, customer[0], "Customer bills fetched successfull")
     );
 });
+
+const getAnalytics = asyncHandler(async (req, res) => {
+  const qmonth = parseInt(req.query.month) || 1;
+  const qyear = parseInt(req.query.year) || 2024;
+
+  const fullDateArray = new Date()
+    .toLocaleString("default", {
+      day: "numeric",
+      month: "numeric",
+      year: "numeric",
+    })
+    .split("/");
+
+  const month = qmonth || fullDateArray[0];
+  const year = qyear || fullDateArray[2];
+  const regexOP = `${month}\/\\d+/${year}`;
+  const regex = new RegExp(regexOP);
+  const analytics = await AnalyticsModel.aggregate([
+    {
+      $match: {
+        year,
+      },
+    },
+    {
+      $addFields: {
+        monthlyData: {
+          $filter: {
+            input: "$monthlyData",
+            as: "monthly",
+            cond: {
+              $eq: [
+                "$$monthly.month",
+                new Date()
+                  .toLocaleString("default", {
+                    month: "long",
+                  })
+                  .slice(0, 3),
+              ],
+            },
+          },
+        },
+        dailyData: {
+          $filter: {
+            input: "$dailyData",
+            as: "daily",
+            cond: {
+              $regexMatch: {
+                input: "$$daily.date",
+                regex,
+              },
+            },
+          },
+        },
+      },
+    },
+  ]);
+  if (!analytics[0]) throw new ApiError(404, "Analytics not found");
+  res
+    .status(200)
+    .json(new ApiResponse(200, analytics[0], "Analytics fetched successfull"));
+});
 export {
   addAdmin,
   addHelper,
   addCM,
   addTailor,
-  // addCustomer,
-  addClothingItem,
-  addMeasurement,
-  addSoldBill,
-  addStitchBill,
   updateEmployee,
   updateCustomer,
   updateClothingItem,
@@ -1461,4 +1526,49 @@ export {
   getEmployee,
   getEmployees,
   getCustomerBills,
+  getAnalytics,
+  addClothingItem,
+  addMeasurement,
+  addSoldBill,
+  addStitchBill,
 };
+
+[
+  {
+    $match: {
+      year: 2024,
+    },
+  },
+  {
+    $addFields: {
+      monthlyData: {
+        $filter: {
+          input: "$monthlyData",
+          as: "monthly",
+          cond: {
+            $eq: [
+              "$$monthly.month",
+              new Date()
+                .toLocaleString("default", {
+                  month: "long",
+                })
+                .slice(0, 3),
+            ],
+          },
+        },
+      },
+      dailyData: {
+        $filter: {
+          input: "$dailyData",
+          as: "daily",
+          cond: {
+            $regexMatch: {
+              input: "$$daily.date",
+              regex: /\d\/\d2\/2024/gm,
+            },
+          },
+        },
+      },
+    },
+  },
+];
