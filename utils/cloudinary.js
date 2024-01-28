@@ -1,6 +1,6 @@
 import { v2 } from "cloudinary";
-import fs from "fs";
 import dotenv from "dotenv";
+import { unLinkFile } from "./unLinkFile.js";
 dotenv.config();
 const cloudinary = v2;
 cloudinary.config({
@@ -20,8 +20,13 @@ const uploadOnCloudinary = async (localFilePath) => {
 
     // Respond with the Cloudinary URL or any other desired information
   } catch (error) {
-    console.log(error);
-    fs.unlinkSync(localFilePath);
+    unLinkFile(localFilePath)
+      .then((result) => {
+        console.log("Deletion result:", result);
+      })
+      .catch((error) => {
+        console.error("Deletion error:", error);
+      });
     return null;
   }
 };

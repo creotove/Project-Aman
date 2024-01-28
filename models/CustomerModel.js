@@ -26,10 +26,10 @@ const customerSchema = new mongoose.Schema(
         },
       ],
     },
-    measurements: {
+    measurements: [{
       type: mongoose.SchemaTypes.ObjectId,
       ref: "measurement",
-    },
+    }],
   },
   { timestamps: true }
 );

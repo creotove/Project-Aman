@@ -9,10 +9,6 @@ const cuttingMasterSchema = new mongoose.Schema({
     type: mongoose.SchemaTypes.ObjectId,
     ref: "user",
   },
-  phoneNumber: {
-    type: Number,
-    required: [true, "Phone number is required"],
-  },
   advance: {
     type: Number,
     default: 0,
@@ -32,22 +28,8 @@ const cuttingMasterSchema = new mongoose.Schema({
   },
   work: [
     {
-      cloth: {
-        type: String,
-        required: [true, "Cloth cutted work name is required"],
-      },
-      quantity: {
-        type: Number,
-        required: [true, "Cloth cutted quantity is required"],
-      },
-      perPiece: {
-        type: Number,
-        required: [true, "Per piece amt is required"],
-      },
-      totalAmount: {
-        type: Number,
-        required: [true, "Cloth cutted total amount is required"],
-      },
+      type: mongoose.SchemaTypes.ObjectId,
+      ref: "work",
     },
   ],
 });

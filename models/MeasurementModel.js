@@ -2,7 +2,8 @@ import mongoose from "mongoose";
 
 const measurementSchema = new mongoose.Schema(
   {
-    name: { // Cloth Measurement Name
+    name: {
+      // Cloth Measurement Name
       type: String,
       required: [true, "Name is required"],
     },
@@ -22,13 +23,9 @@ const measurementSchema = new mongoose.Schema(
         {
           name: String,
           value: String,
-          description: String,
         },
       ],
       default: [{ name: "No Req.", value: "", description: "" }],
-    },
-    drawing: {
-      type: String,
     },
   },
   { timestamps: true }
@@ -48,14 +45,6 @@ export default MeasurementModel;
 //       sleeve: 10,
 //       length: 10,
 //     },
-//     customerRequirements: [
-//       {
-//         name: "Shirt",
-//         value: "Shirt",
-//         description: "Shirt",
-//       },
-//     ],
-//     drawing: "https://i.imgur.com/4Xg0Y5v.jpg",
 //   },
 //   {
 //     name: "Pant",

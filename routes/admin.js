@@ -1,10 +1,7 @@
 import express from "express";
 import {
   addAdmin,
-  addHelper,
-  addCM,
-  addTailor,
-  // addCustomer,
+  addEmployee,
   addClothingItem,
   addMeasurement,
   addSoldBill,
@@ -12,15 +9,20 @@ import {
   updateEmployee,
   updateCustomer,
   getCustomers,
-  getCustomer,
-  getEmployee,
   getEmployees,
   getCustomerProfile,
   getCustomerBills,
   getAnalytics,
+  getEmployeeProfile,
+  login,
+  logout,
+  changePassword,
+  addWorkForEmployee,
+  addAdvanceForEmployee,
 } from "../controllers/adminCtrls.js";
 import { upload } from "../middlewares/multer.js";
 import { addBillNumber } from "../middlewares/billNumber.js";
+import { auth } from "../middlewares/auth.js";
 const router = express.Router();
 
 // POST || Creation
@@ -33,77 +35,30 @@ router.post(
     },
   ]),
   addAdmin
-);
+); // -> /api/admin/addAdmin
 
 router.post(
-  "/addCM",
+  "/addEmployee",
   upload.fields([
     {
       name: "avatar",
       maxCount: 1,
     },
   ]),
-  addCM
-); // -> /api/admin/addCM
+  addEmployee
+); // -> /api/admin/addEmployee
 
-router.post(
-  "/addTailor",
-  upload.fields([
-    {
-      name: "avatar",
-      maxCount: 1,
-    },
-  ]),
-  addTailor
-); // -> /api/admin/addTailor
+router.post("/addClothingItem", addClothingItem); // -> /api/admin/addClothingItem
 
-router.post(
-  "/addHelper",
-  upload.fields([
-    {
-      name: "avatar",
-      maxCount: 1,
-    },
-  ]),
-  addHelper
-); // -> /api/admin/addHelper
-
-// router.post(
-//   "/addCustomer",
-//   upload.fields([
-//     {
-//       name: "avatar",
-//       maxCount: 1,
-//     },
-//   ]),
-//   addCustomer
-// ); // -> /api/admin/addCustomer
-
-router.post(
-  "/addCloth",
-  upload.fields([
-    {
-      name: "image",
-      maxCount: 1,
-    },
-  ]),
-  addClothingItem
-); // -> /api/admin/addCloth
-
-router.post(
-  "/addMeasurement/:id",
-  upload.fields([
-    {
-      name: "drawung",
-      maxCount: 1,
-    },
-  ]),
-  addMeasurement
-); // -> /api/admin/addMeasurement
+router.post("/addMeasurement/:id", addMeasurement); // -> /api/admin/addMeasurement
 
 router.post("/addStitchBill", addBillNumber, addStitchBill); // -> /api/admin/addStitchBill
 
 router.post("/addSoldBill", addBillNumber, addSoldBill); // -> /api/admin/addSoldBill
+
+router.post("/addWork/:id", addWorkForEmployee); // -> /api/admin/addWork
+
+router.post("/addAdvance/:id", addAdvanceForEmployee); // -> /api/admin/addWork
 
 // PATCH || Update
 router.patch(
@@ -128,12 +83,17 @@ router.patch(
   updateCustomer
 ); // -> /api/admin/updateCustomer/:id
 
+router.patch("/changePassword", auth, changePassword); // -> /api/admin/changePassword
+
 // GET || Read
 router.get("/customers", getCustomers); // -> /api/admin/customers
 router.get("/customer/:id", getCustomerProfile); // -> /api/admin/customer/:id
 router.get("/bills/:id", getCustomerBills); // -> /api/admin/bills/:id
 router.get("/employees", getEmployees); // -> /api/admin/employees
-router.get("/employee/:id", getEmployee); // -> /api/admin/employees/:id
+router.get("/employee/:id", getEmployeeProfile); // -> /api/admin/employees/:id
 router.get("/analytics", getAnalytics); // -> /api/admin/analytics
 
+// Authentication
+router.post("/login", login); // -> /api/admin/login
+router.post("/logout", auth, logout); // -> /api/admin/logout
 export default router;

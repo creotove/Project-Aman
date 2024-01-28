@@ -1,4 +1,5 @@
 import bcryptjs from "bcryptjs";
+import jwt from "jsonwebtoken";
 
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -16,10 +17,10 @@ import CustomerModel from "../models/CustomerModel.js";
 import MeasurementHistoryModel from "../models/MeasurementHistoryModel.js";
 import SoldBillModel from "../models/SoldBillModel.js";
 import StitchBillModel from "../models/StitchBillModel.js";
-import BillNumberCounter from "../models/BillNumberCounter.js";
 import { analyticsAdd } from "../utils/analyticsAdd.js";
 import mongoose from "mongoose";
 import AnalyticsModel from "../models/AnalyticsModel.js";
+import WorkModel from "../models/WorkModel.js";
 
 // Utility function for pagination
 function paginatedData(Model) {
@@ -53,6 +54,71 @@ function paginatedData(Model) {
     }
   };
 }
+// Utility function for Access and Refresh Token
+async function generateAccessAndRefreshToken(userId) {
+  try {
+    const user = await UserModel.findById(userId);
+    if (!user)
+      throw new ApiError(404, "User not found in access and refresh token");
+
+    const accessToken = jwt.sign(
+      {
+        _id: user._id,
+        role: user.role,
+      },
+      process.env.ACCESS_TOKEN_SECRET,
+      {
+        expiresIn: "2d",
+      }
+    );
+
+    const refreshToken = jwt.sign(
+      {
+        _id: user._id,
+        role: user.role,
+      },
+      process.env.REFRESH_TOKEN_SECRET,
+      {
+        expiresIn: "7d",
+      }
+    );
+
+    user.refreshToken = refreshToken;
+    await user.save();
+    return { accessToken, refreshToken };
+  } catch (error) {
+    throw new ApiError(500, "Something went wrong while generating tokens");
+  }
+}
+// Utility function for regenerating the access token if it is expired - Middleware (May not be used)
+const refreshAccessToken = asyncHandler(async (req, res) => {
+  const incomingRefreshToken = req.body.refreshToken;
+  if (!incomingRefreshToken)
+    throw new ApiError(401, "Unauthorized, Refresh token is required");
+
+  const decodedToken = jwt.verify(
+    incomingRefreshToken,
+    process.env.REFRESH_TOKEN_SECRET
+  );
+
+  const user = await UserModel.findById(decodedToken._id);
+  if (!user) throw new ApiError(404, "User not found");
+
+  if (user.refreshToken !== incomingRefreshToken)
+    throw new ApiError(401, "Refresh token is not valid");
+
+  const { accessToken, refreshToken } = await generateAccessAndRefreshToken(
+    user._id
+  );
+
+  return res.status(200).json(
+    new ApiResponse(200, {
+      accessToken,
+      refreshToken,
+    })
+  );
+});
+
 // Steps to create Customer & Employee
 // 1. Extract the values from the body
 // 2. Check the fields if they are empty then throw error
@@ -99,12 +165,13 @@ const addAdmin = asyncHandler(async (req, res) => {
   if (!avatar) throw new ApiError(400, "Avatar is required");
 
   /// Step 6
-  const unlinked = unLinkFile(localpath);
-  if (unlinked) {
-    console.log("File deleted successfully");
-  } else {
-    throw new ApiError(400, "Error in deleting the file");
-  }
+  unLinkFile(localpath)
+    .then((result) => {
+      console.log("Deletion result:", result);
+    })
+    .catch((error) => {
+      console.error("Deletion error:", error);
+    });
 
   // Step 7
   const newUser = await UserModel.create({
@@ -135,25 +202,26 @@ const addAdmin = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, createdUser, "User registered successfully"));
 });
 
-const addHelper = asyncHandler(async (req, res) => {
+const addEmployee = asyncHandler(async (req, res) => {
   // Step 1
-  const { name, phoneNumber, monthly, aadharnumber } = req.body;
-  console.log(req.body);
+  const { name, phoneNumber, role, aadharnumber, monthly } = req.body;
 
   // Step 2
   if (name.trim() === "") {
     throw new ApiError(400, "Name is Required");
   } else if (phoneNumber === undefined) {
     throw new ApiError(400, "Phone number is Required");
+  } else if (role === undefined) {
+    throw new ApiError(400, "Role is Required");
+  } else if (aadharnumber === undefined) {
+    throw new ApiError(400, "Aadhar number is Required");
   } else if (monthly === undefined) {
-    throw new ApiError(400, "Phone number is Required");
-  } else if (aadharnumber === undefined) {
-    throw new ApiError(400, "Aadhar number is Required");
+    throw new ApiError(400, "Monthly income is Required");
   }
 
   // Step 3
   const existedUser = await UserModel.findOne({
-    $or: [{ phoneNumber }, { name }],
+    phoneNumber,
   });
   if (existedUser) {
     throw new ApiError(409, "User already exists");
@@ -161,91 +229,7 @@ const addHelper = asyncHandler(async (req, res) => {
 
   // Step 4
   const salt = await bcryptjs.genSalt(10);
-  const hashedPassword = await bcryptjs.hash(phoneNumber, salt);
-
-  // Step 5
-  const localpath = req.files.avatar[0]?.path;
-  if (!localpath) throw new ApiError(400, "Avatar is required in local path");
-  const avatar = await uploadOnCloudinary(localpath);
-  if (!avatar) throw new ApiError(400, "Avatar is required in cloudinary url");
-
-  // Step 6
-  const unlinked = unLinkFile(localpath);
-  if (unlinked) {
-    console.log("File deleted successfully");
-  } else {
-    throw new ApiError(400, "Error in deleting the file");
-  }
-
-  // Step 7
-  const newUser = await UserModel.create({
-    name,
-    password: hashedPassword,
-    phoneNumber,
-    avatar: avatar.url,
-    role: "HELPER",
-    aadharnumber,
-  });
-  // Step 8
-  if (!newUser)
-    throw new ApiError(500, "Something went wrong while creating the user");
-
-  // Step 8.1
-  const newHelper = HelperModel.create({
-    name,
-    phoneNumber,
-    monthly,
-    userDocument: newUser._id,
-  });
-
-  // Step 8.2
-  if (!newHelper)
-    throw new ApiError(500, "Something went wrong while creating the user");
-
-  // Step 8.3
-  (await newHelper).save();
-
-  // Step 9
-  const createdHelper = await UserModel.findById(newUser._id).select(
-    "-password -refreshToken"
-  );
-  if (!createdHelper) {
-    throw new ApiError(500, "Something went wrong while creating the user");
-  }
-
-  // Step 10
-  await newUser.save();
-
-  // Step 11
-  return res
-    .status(201)
-    .json(new ApiResponse(200, createdHelper, "User registered successfully"));
-});
-
-const addCM = asyncHandler(async (req, res) => {
-  // Step 1
-  const { name, phoneNumber, aadharnumber } = req.body;
-
-  // Step 2
-  if (name.trim() === "") {
-    throw new ApiError(400, "Name is Required");
-  } else if (phoneNumber === undefined) {
-    throw new ApiError(400, "Phone number is Required");
-  } else if (aadharnumber === undefined) {
-    throw new ApiError(400, "Aadhar number is Required");
-  }
-
-  // Step 3
-  const existedUser = await UserModel.findOne({
-    $or: [{ phoneNumber }, { name }],
-  });
-  if (existedUser) {
-    throw new ApiError(409, "User already exists");
-  }
-
-  // Step 4
-  const salt = await bcryptjs.genSalt(10);
-  const hashedPassword = await bcryptjs.hash(phoneNumber, salt);
+  const hashedPassword = await bcryptjs.hash(phoneNumber.toString(), salt);
 
   // Step 5
   const localpath = req.files?.avatar[0]?.path;
@@ -254,12 +238,13 @@ const addCM = asyncHandler(async (req, res) => {
   if (!avatar) throw new ApiError(400, "Avatar is required");
 
   // Step 6
-  const unlinked = unLinkFile(localpath);
-  if (unlinked) {
-    console.log("File deleted successfully");
-  } else {
-    throw new ApiError(400, "Error in deleting the file");
-  }
+  unLinkFile(localpath)
+    .then((result) => {
+      console.log("Deletion result:", result);
+    })
+    .catch((error) => {
+      console.error("Deletion error:", error);
+    });
 
   // Step 7
   const newUser = await UserModel.create({
@@ -267,8 +252,7 @@ const addCM = asyncHandler(async (req, res) => {
     password: hashedPassword,
     phoneNumber,
     avatar: avatar.url,
-    role: "CUTTING MASTER",
-    aadharnumber,
+    role,
   });
 
   // Step 8
@@ -276,36 +260,63 @@ const addCM = asyncHandler(async (req, res) => {
     throw new ApiError(500, "Something went wrong while creating the user");
 
   // Step 8.1
-  const newCuttingMaster = CuttingMasterModel.create({
-    name,
-    phoneNumber,
-    userDocument: newUser._id,
-    cuttingAmounts: new Map(),
-  });
-
-  // Step 8.2
-  if (!newCuttingMaster)
-    throw new ApiError(500, "Something went wrong while creating the user");
-  const clothingItems = await ClothingModel.find();
-  if (clothingItems.length === 0) {
-    console.log("Currently No clothing items are there");
-  } else {
-    for (const clothingItem of clothingItems) {
-      newCuttingMaster.cuttingAmounts.set(
-        clothingItem.name,
-        clothingItem.defaultCuttingAmt
-      );
+  if (role === "HELPER") {
+    const newHelper = await HelperModel.create({
+      name,
+      phoneNumber,
+      monthly,
+      user_id: newUser._id,
+      aadharnumber,
+    });
+    if (!newHelper)
+      throw new ApiError(500, "Something went wrong while creating the user");
+    await newHelper.save();
+  } else if (role === "CM") {
+    const newCuttingMaster = await CuttingMasterModel.create({
+      name,
+      phoneNumber,
+      user_id: newUser._id,
+      cuttingAmounts: new Map(),
+      aadharnumber,
+    });
+    if (!newCuttingMaster)
+      throw new ApiError(500, "Something went wrong while creating the user");
+    const clothingItems = await ClothingModel.find();
+    if (clothingItems.length === 0) {
+      console.log("Currently No clothing items are there");
+    } else {
+      for (const clothingItem of clothingItems) {
+        newCuttingMaster.cuttingAmounts.set(
+          clothingItem.name,
+          clothingItem.cuttingAmt
+        );
+      }
     }
-  }
-  // Step 8.3
-  (await newCuttingMaster).save();
-
-  // Step 9
-  const createdCuttingMaster = await UserModel.findById(newUser._id).select(
-    "-password -refreshToken"
-  );
-  if (!createdCuttingMaster) {
-    throw new ApiError(500, "Something went wrong while creating the user");
+    await newCuttingMaster.save();
+  } else if (role === "TAILOR") {
+    const newTailor = await TailorModel.create({
+      name,
+      phoneNumber,
+      user_id: newUser._id,
+      stitchingAmounts: new Map(),
+      aadharnumber,
+    });
+    if (!newTailor)
+      throw new ApiError(500, "Something went wrong while creating the user");
+    const clothingItems = await ClothingModel.find();
+    if (clothingItems.length === 0) {
+      console.log("Currently No clothing items are there");
+    } else {
+      for (const clothingItem of clothingItems) {
+        newTailor.stitchingAmounts.set(
+          clothingItem.name,
+          clothingItem.stitchingAmtTailor
+        );
+      }
+    }
+    await newTailor.save();
+  } else {
+    throw new ApiError(400, "Role is not valid");
   }
 
   // Step 10
@@ -314,204 +325,103 @@ const addCM = asyncHandler(async (req, res) => {
   // Step 11
   return res
     .status(201)
-    .json(
-      new ApiResponse(200, createdCuttingMaster, "User registered successfully")
-    );
+    .json(new ApiResponse(200, {}, "New employee registered successfully"));
 });
 
-const addTailor = asyncHandler(async (req, res) => {
-  // Step 1
-  const { name, phoneNumber, aadharnumber } = req.body;
+const addWorkForEmployee = asyncHandler(async (req, res) => {
+  const { id } = req.params; // user id
 
-  // Step 2
-  if (name.trim() === "") {
-    throw new ApiError(400, "Name is Required");
-  } else if (phoneNumber === undefined) {
-    throw new ApiError(400, "Phone number is Required");
-  } else if (aadharnumber === undefined) {
-    throw new ApiError(400, "Aadhar number is Required");
+  if (id === undefined) throw new ApiError(400, "User Id is Required");
+
+  const user = await UserModel.findById(id);
+  if (!user) throw new ApiError(404, "User not found");
+
+  const { work, totalAmount } = req.body;
+
+  if (work === undefined) {
+    throw new ApiError(400, "Cloth is Required");
+  } else if (totalAmount === undefined) {
+    throw new ApiError(400, "Total Amount is Required");
+  }
+  let employee;
+  if (user.role === "TAILOR") {
+    employee = await TailorModel.findOne({ user_id: id });
+    if (!employee) throw new ApiError(404, "Tailor not found");
+    employee.earned += totalAmount;
+  } else if (user.role === "CM") {
+    employee = await CuttingMasterModel.findOne({ user_id: id });
+    if (!employee) throw new ApiError(404, "Cutting Master not found");
+    employee.earned += totalAmount;
   }
 
-  // Step 3
-  const existedUser = await UserModel.findOne({
-    $or: [{ phoneNumber }, { name }],
+  const newWork = await WorkModel.create({
+    employeeId: employee._id,
+    work,
+    totalAmount,
   });
-  if (existedUser) {
-    throw new ApiError(409, "User already exists");
-  }
-
-  // Step 4
-  const salt = await bcryptjs.genSalt(10);
-  const hashedPassword = await bcryptjs.hash(phoneNumber, salt);
-
-  // Step 5
-  const localpath = req.files?.avatar[0]?.path;
-  if (!localpath) throw new ApiError(400, "Avatar is required");
-  const avatar = await uploadOnCloudinary(localpath);
-  if (!avatar) throw new ApiError(400, "Avatar is required");
-
-  // Step 6
-  const unlinked = unLinkFile(localpath);
-  if (unlinked) {
-    console.log("File deleted successfully");
-  } else {
-    throw new ApiError(400, "Error in deleting the file");
-  }
-
-  // Step 7
-  const newUser = await UserModel.create({
-    name,
-    password: hashedPassword,
-    phoneNumber,
-    avatar: avatar.url,
-    role: "CUTTING MASTER",
-    aadharnumber,
-  });
-
-  // Step 8
-  if (!newUser)
+  if (!newWork)
     throw new ApiError(500, "Something went wrong while creating the user");
 
-  // Step 8.1
-  const newTailor = TailorModel.create({
-    name,
-    phoneNumber,
-    userDocument: newUser._id,
-  });
-
-  // Step 8.2
-  if (!newTailor)
+  employee.work.push(newWork._id);
+  await newWork.save();
+  await employee.save();
+  if (!newWork)
     throw new ApiError(500, "Something went wrong while creating the user");
-  const clothingItems = await ClothingModel.find();
-  if (clothingItems.length === 0) {
-    console.log("Currently No clothing items are there");
-  } else {
-    for (const clothingItem of clothingItems) {
-      (await newTailor).stitchingAmounts.set(
-        clothingItem.name,
-        clothingItem.defaultStitchingAmt
-      );
-    }
-  }
-  // Step 8.3
-  (await newCuttingMaster).save();
+  await newWork.save();
 
-  // Step 9
-  const createdCuttingMaster = await UserModel.findById(newUser._id).select(
-    "-password -refreshToken"
-  );
-  if (!createdCuttingMaster) {
-    throw new ApiError(500, "Something went wrong while creating the user");
-  }
-
-  // Step 10
-  await newUser.save();
-
-  // Step 11
   return res
     .status(201)
-    .json(
-      new ApiResponse(200, createdCuttingMaster, "User registered successfully")
-    );
+    .json(new ApiResponse(201, {}, "Work added successfully"));
 });
 
-// const addCustomer = asyncHandler(async (req, res) => {
-//   // Step 1
-//   const { name, phoneNumber } = req.body;
+const addAdvanceForEmployee = asyncHandler(async (req, res) => {
+  const { id } = req.params; // user id
+  if (id === undefined) throw new ApiError(400, "User Id is Required");
 
-//   // Step 2
-//   if (name.trim() === "") {
-//     throw new ApiError(400, "Name is Required");
-//   } else if (phoneNumber === undefined) {
-//     throw new ApiError(400, "Phone number is Required");
-//   }
-//   // Step 2 try
-//   [name, phoneNumber].some((field) => {
-//     if (field.trim() === "") {
-//       throw new ApiError(400, `${field} is Required`);
-//     }
-//   });
+  const { advance } = req.body;
+  if (advance === undefined) throw new ApiError(400, "Advance is Required");
 
-//   // Step 3
-//   const existedUser = await UserModel.findOne({
-//     $or: [{ phoneNumber }, { name }],
-//   });
-//   if (existedUser) {
-//     throw new ApiError(409, "User already exists");
-//   }
+  const user = await UserModel.findById(id);
+  if (!user) throw new ApiError(404, "User not found");
 
-//   // Step 4
-//   const salt = await bcryptjs.genSalt(10);
-//   const hashedPassword = await bcryptjs.hash(phoneNumber, salt);
+  let employee;
+  if (user.role === "TAILOR") {
+    employee = await TailorModel.findOne({ user_id: id });
+    if (!employee) throw new ApiError(404, "Tailor not found");
+  } else if (user.role === "CM") {
+    employee = await CuttingMasterModel.findOne({ user_id: id });
+    if (!employee) throw new ApiError(404, "Cutting Master not found");
+  } else if (user.role === "HELPER") {
+    employee = await HelperModel.findOne({ user_id: id });
+    if (!employee) throw new ApiError(404, "Helper not found");
+  }
 
-//   // Step 5
-//   const localpath = req.files?.avatar[0]?.path;
-//   if (!localpath) throw new ApiError(400, "Avatar is required");
-//   const avatar = await uploadOnCloudinary(localpath);
-//   if (!avatar) throw new ApiError(400, "Avatar is required");
+  employee.advance += advance;
+  await employee.save();
 
-//   // Step 6
-//   const unlinked = unLinkFile(localpath);
-//   if (unlinked) {
-//     console.log("File deleted successfully");
-//   } else {
-//     throw new ApiError(400, "Error in deleting the file");
-//   }
-
-//   // Step 7
-//   const newUser = await UserModel.create({
-//     name,
-//     password: hashedPassword,
-//     phoneNumber,
-//     avatar: avatar.url,
-//     role: "CUSTOMER",
-//   });
-
-//   // Step 8
-//   if (!newUser)
-//     throw new ApiError(500, "Something went wrong while creating the user");
-
-//   // Step 8.1
-//   const newCustomer = CustomerModel.create({
-//     name,
-//     user_id: newUser._id,
-//   });
-
-//   // Step 8.2
-//   if (!newCustomer)
-//     throw new ApiError(500, "Something went wrong while creating the user");
-
-//   // Step 8.3
-//   (await newCustomer).save();
-
-//   // Step 9
-//   const createdUser = await UserModel.findById(newUser._id).select(
-//     "-password -refreshToken"
-//   );
-//   if (!createdUser) {
-//     throw new ApiError(500, "Something went wrong while fetching the user");
-//   }
-
-//   // Step 10
-//   await newUser.save();
-
-//   // Step 11
-//   return res
-//     .status(201)
-//     .json(new ApiResponse(201, createdUser, "User registered successfully"));
-// });
+  return res
+    .status(201)
+    .json(new ApiResponse(201, {}, "Advance added successfully"));
+});
 
 const addClothingItem = asyncHandler(async (req, res) => {
-  const { name, stitchingAmt, defaultStitchingAmt, defaultCuttingAmt } =
-    req.body;
+  const {
+    name,
+    stitchingAmtCustomer,
+    stitchingAmtTailor,
+    cuttingAmt,
+    measurements,
+  } = req.body;
   if (name.trim() === "") {
     throw new ApiError(400, "Name is Required");
-  } else if (stitchingAmt === undefined) {
+  } else if (stitchingAmtCustomer === undefined) {
     throw new ApiError(400, "Stitching is Required");
-  } else if (defaultStitchingAmt === undefined) {
+  } else if (stitchingAmtTailor === undefined) {
     throw new ApiError(400, "Default Stitching Amount is Required");
-  } else if (defaultCuttingAmt === undefined) {
+  } else if (cuttingAmt === undefined) {
     throw new ApiError(400, "Default Cutting Amount is Required");
+  } else if (measurements === undefined) {
+    throw new ApiError(400, "Measurement is Required");
   }
 
   const existedClothingItem = await ClothingModel.findOne({
@@ -520,32 +430,37 @@ const addClothingItem = asyncHandler(async (req, res) => {
   if (existedClothingItem) {
     throw new ApiError(409, "Clothing Item already exists");
   }
-  let imageUrl;
-  if (req.files?.image) {
-    console.log("in image upload");
-    const localpath = req.files?.image[0]?.path;
-    if (!localpath) throw new ApiError(400, "Image is required");
-    const image = await uploadOnCloudinary(localpath);
-    imageUrl = image.url;
-    if (!image) throw new ApiError(400, "Image is required");
-
-    const unlinked = unLinkFile(localpath);
-    if (unlinked) {
-      console.log("File deleted successfully");
-    } else {
-      throw new ApiError(400, "Error in deleting the file");
-    }
-  }
 
   const newClothingItem = await ClothingModel.create({
     name,
-    stitchingAmt,
-    defaultStitchingAmt,
-    defaultCuttingAmt,
-    image: imageUrl ? imageUrl : "N/A",
+    stitchingAmtCustomer,
+    stitchingAmtTailor,
+    cuttingAmt,
+    measurements,
   });
   if (!newClothingItem)
     throw new ApiError(500, "Something went wrong while creating the user");
+
+  const tailors = await TailorModel.find();
+  if (tailors.length === 0) {
+    console.log("Currently No tailors are there");
+  } else {
+    for (const tailor of tailors) {
+      tailor.stitchingAmounts.set(name, stitchingAmtTailor);
+      await tailor.save();
+    }
+  }
+
+  const cuttingMasters = await CuttingMasterModel.find();
+  if (cuttingMasters.length === 0) {
+    console.log("Currently No cutting masters are there");
+  } else {
+    for (const cuttingMaster of cuttingMasters) {
+      cuttingMaster.cuttingAmounts.set(name, cuttingAmt);
+      await cuttingMaster.save();
+    }
+  }
+  
   await newClothingItem.save();
   return res
     .status(201)
@@ -566,6 +481,9 @@ const addMeasurement = asyncHandler(async (req, res) => {
   } else if (id === undefined) {
     throw new ApiError(400, "Customer Id is Required");
   }
+  const customer = await CustomerModel.findById(id);
+  if (!customer) throw new ApiError(404, "Customer not found");
+  
   const newMeasurements = await MeasurementModel.create({
     name,
     customer_id: id,
@@ -576,18 +494,22 @@ const addMeasurement = asyncHandler(async (req, res) => {
   });
   if (!newMeasurements)
     throw new ApiError(500, "Something went wrong while creating the user");
+
   const newMeasurementHistory = await MeasurementHistoryModel.create({
     measurement_id: newMeasurements._id,
     customer_id: id,
   });
+
   if (!newMeasurementHistory)
-    throw new ApiError(500, "Something went wrong while creating the user");
+  throw new ApiError(500, "Something went wrong while creating the user");
+  customer.measurements.push(newMeasurements._id);
   await newMeasurementHistory.save();
   await newMeasurements.save();
+  await customer.save();
 
   return res
     .status(201)
-    .json(new ApiResponse(201, "Add Measurement for customer successfully"));
+    .json(new ApiResponse(201, `Add Measurement for ${customer?.name} successfully`));
 });
 
 const addSoldBill = asyncHandler(async (req, res) => {
@@ -849,12 +771,13 @@ const updateEmployee = asyncHandler(async (req, res) => {
       const newAvatar = await uploadOnCloudinary(localpath);
       if (!newAvatar) throw new ApiError(400, "Avatar is required");
       cuttingMaster.avatar = newAvatar;
-      const unlinked = unLinkFile(localpath);
-      if (unlinked) {
-        console.log("File deleted successfully");
-      } else {
-        throw new ApiError(400, "Error in deleting the file");
-      }
+      unLinkFile(localpath)
+        .then((result) => {
+          console.log("Deletion result:", result);
+        })
+        .catch((error) => {
+          console.error("Deletion error:", error);
+        });
     }
     if (password) cuttingMaster.password = password;
     if (advance) cuttingMaster.advance = advance;
@@ -882,12 +805,13 @@ const updateEmployee = asyncHandler(async (req, res) => {
       const newAvatar = await uploadOnCloudinary(localpath);
       if (!newAvatar) throw new ApiError(400, "Avatar is required");
       tailor.avatar = newAvatar;
-      const unlinked = unLinkFile(localpath);
-      if (unlinked) {
-        console.log("File deleted successfully");
-      } else {
-        throw new ApiError(400, "Error in deleting the file");
-      }
+      unLinkFile(localpath)
+        .then((result) => {
+          console.log("Deletion result:", result);
+        })
+        .catch((error) => {
+          console.error("Deletion error:", error);
+        });
     }
     if (password) tailor.password = password;
     if (advance) tailor.advance = advance;
@@ -915,12 +839,13 @@ const updateCustomer = asyncHandler(async (req, res) => {
     const user = await UserModel.findById(customer.user_id);
     if (!user) throw new ApiError(404, "User not found");
     user.avatar = newAvatar;
-    const unlinked = unLinkFile(localpath);
-    if (unlinked) {
-      console.log("File deleted successfully");
-    } else {
-      throw new ApiError(400, "Error in deleting the file");
-    }
+    unLinkFile(localpath)
+      .then((result) => {
+        console.log("Deletion result:", result);
+      })
+      .catch((error) => {
+        console.error("Deletion error:", error);
+      });
   }
   if (password) customer.password = password;
   await customer.save();
@@ -965,6 +890,26 @@ const updateMeasurement = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, "Measurement Updated Successfully"));
+});
+
+const changePassword = asyncHandler(async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  const userId = req.user._id;
+
+  const user = await UserModel.findById(userId);
+  if (!user) throw new ApiError(404, "User not found");
+
+  const isMatch = await bcryptjs.compare(oldPassword, user.password);
+  if (!isMatch) throw new ApiError(400, "Password is invalid");
+
+  const salt = await bcryptjs.genSalt(10);
+  const hashedPassword = await bcryptjs.hash(newPassword.toString(), salt);
+  user.password = hashedPassword;
+  await user.save();
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Password changed successfully"));
 });
 
 // Retrive || GET
@@ -1026,95 +971,6 @@ const getCustomers = asyncHandler(async (req, res) => {
         200,
         res.paginatedResults,
         "Customers Retrived Successfully"
-      )
-    );
-});
-
-const getEmployee = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const { name, phoneNumber } = req.params;
-  const user = await UserModel.findOne({
-    $or: [{ _id: id }, { name }, { phoneNumber }],
-  }).select("-password -refreshToken");
-  if (!user) throw new ApiError(404, "User not found");
-  if (user.role === "HELPER") {
-    const helper = await HelperModel.findOne({ user_id: user._id });
-    if (!helper) throw new ApiError(404, "Helper not found");
-    return res
-      .status(200)
-      .json(new ApiResponse(200, helper, "Helper Retrived Successfully"));
-  }
-  if (user.role === "CUTTING MASTER") {
-    const cuttingMaster = await CuttingMasterModel.findOne({
-      user_id: user._id,
-    });
-    if (!cuttingMaster) throw new ApiError(404, "Cutting Master not found");
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(
-          200,
-          cuttingMaster,
-          "Cutting Master Retrived Successfully"
-        )
-      );
-  }
-  if (user.role === "TAILOR") {
-    const tailor = await TailorModel.findOne({ user_id: user._id });
-    if (!tailor) throw new ApiError(404, "Tailor not found");
-    return res
-      .status(200)
-      .json(new ApiResponse(200, tailor, "Tailor Retrived Successfully"));
-  }
-});
-
-const getEmployees = asyncHandler(async (req, res) => {
-  const { employeeType } = req.query;
-  if (!employeeType) {
-    const { page, limit } = req.query;
-    const employees = await UserModel.find({
-      role: { $ne: "CUSTOMER" },
-    }).select("-password -refreshToken");
-    const totalEmployees = employees.length;
-    const startIndex = (page - 1) * limit ? limit : 10;
-    const endIndex = page * limit ? limit : 10;
-    const results = {};
-    if (endIndex < totalEmployees) {
-      results.next = {
-        page: page + 1,
-        limit: limit ? limit : 10,
-      };
-    }
-    if (startIndex > 0) {
-      results.previous = {
-        page: page - 1,
-        limit: limit ? limit : 10,
-      };
-    }
-    results.totalEmployees = totalEmployees;
-    results.results = await UserModel.find({ role: { $ne: "CUSTOMER" } })
-      .sort({ createdAt: -1 })
-      .limit(limit ? limit : 10)
-      .skip(startIndex);
-    return res
-      .status(200)
-      .json(new ApiResponse(200, results, "Employees Retrived Successfully"));
-  }
-  if (employeeType === "HELPER") {
-    await paginatedData(HelperModel)(req, res);
-  } else if (employeeType === "CUTTING MASTER") {
-    await paginatedData(CuttingMasterModel)(req, res);
-  } else if (employeeType === "TAILOR") {
-    await paginatedData(TailorModel)(req, res);
-  }
-
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        res.paginatedResults,
-        "Employees Retrived Successfully"
       )
     );
 });
@@ -1467,6 +1323,22 @@ const getAnalytics = asyncHandler(async (req, res) => {
   const year = qyear || fullDateArray[2];
   const regexOP = `${month}\/\\d+/${year}`;
   const regex = new RegExp(regexOP);
+  const monthArray = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sept",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  const qMonthInString = monthArray[month - 1]; // 0 based indexing
+
   const analytics = await AnalyticsModel.aggregate([
     {
       $match: {
@@ -1482,11 +1354,8 @@ const getAnalytics = asyncHandler(async (req, res) => {
             cond: {
               $eq: [
                 "$$monthly.month",
-                new Date()
-                  .toLocaleString("default", {
-                    month: "long",
-                  })
-                  .slice(0, 3),
+                qMonthInString
+                
               ],
             },
           },
@@ -1511,64 +1380,186 @@ const getAnalytics = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, analytics[0], "Analytics fetched successfull"));
 });
+
+const getEmployees = asyncHandler(async (req, res) => {
+  const employees = await UserModel.aggregate([
+    {
+      $match: {
+        role: {
+          $nin: ["CUSTOMER", "ADMIN"],
+        },
+      },
+    },
+    {
+      $project: {
+        password: 0,
+        refreshToken: 0,
+        forgotPasswordToken: 0,
+        phoneNumber: 0,
+        forgotPasswordTokenExpiry: 0,
+        verifyToken: 0,
+        verifyTokenExpiry: 0,
+        __v: 0,
+      },
+    },
+  ]);
+  if (!employees[0]) throw new ApiError(404, "Employees not found");
+  res
+    .status(200)
+    .json(new ApiResponse(200, employees, "Employees fetched successfull"));
+});
+
+const getEmployeeProfile = asyncHandler(async (req, res) => {
+  const { id } = req.params; // user id
+  let qrole = req.query.role;
+  const limit = parseInt(req.query.limit) || 2; // pageSize
+  const page = parseInt(req.query.page) || 1; // pageNumber
+  if (qrole === "CM") {
+    qrole = "cuttingmaster";
+  }
+  if (!id) throw new ApiError(400, "Id is required to fetch the employee");
+  if (!qrole) throw new ApiError(400, "Role is required to fetch the employee");
+  const role = qrole.toLowerCase() + "s";
+  console.log(role);
+  const employee = await UserModel.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(id),
+      },
+    },
+    {
+      $lookup: {
+        from: role,
+        localField: "_id",
+        foreignField: "user_id",
+        as: "employeeDetails",
+      },
+    },
+    {
+      $addFields: {
+        employeeDetails: {
+          $arrayElemAt: ["$employeeDetails", 0],
+        },
+      },
+    },
+    {
+      $lookup: {
+        from: "works",
+        localField: "employeeDetails._id",
+        foreignField: "employeeId",
+        as: "workDetails",
+        pipeline: [
+          {
+            $sort: {
+              createdAt: -1,
+            },
+          },
+          {
+            $project: {
+              createdAt: 1,
+              totalAmount: 1,
+            },
+          },
+        ],
+      },
+    },
+    // pagination
+    {
+      $addFields: {
+        total: { $size: "$workDetails" },
+        page,
+        limit,
+        workDetails: {
+          $slice: [
+            "$workDetails",
+            { $add: [{ $multiply: [page, limit] }, -limit] },
+            limit,
+          ],
+        },
+      },
+    },
+    {
+      $project: {
+        forgotPasswordToken: 0,
+        forgotPasswordTokenExpiry: 0,
+        verifyToken: 0,
+        verifyTokenExpiry: 0,
+        password: 0,
+        refreshToken: 0,
+        __v: 0,
+      },
+    },
+  ]);
+  if (!employee[0]) throw new ApiError(404, "Employee not found");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, employee[0], "Employee fetched successfull"));
+});
+
+// Auth || POST
+const login = asyncHandler(async (req, res) => {
+  const { phoneNumber, password } = req.body;
+  if (!phoneNumber) throw new ApiError(400, "Phone number is required");
+  if (!password) throw new ApiError(400, "Password is required");
+
+  const user = await UserModel.findOne({ phoneNumber });
+  if (!user) throw new ApiError(404, "User not found");
+
+  const isMatch = await bcryptjs.compare(password, user.password);
+  if (!isMatch) throw new ApiError(401, "Invalid credentials");
+
+  const { accessToken, refreshToken } = await generateAccessAndRefreshToken(
+    user._id
+  );
+
+  const loggedInUser = await UserModel.findById(user._id).select(
+    "-password -refreshToken -forgotPasswordToken -forgotPasswordTokenExpiry -verifyToken -verifyTokenExpiry -__v"
+  );
+
+  return res.status(200).json(
+    new ApiResponse(200, {
+      user: loggedInUser,
+      accessToken,
+      refreshToken,
+    })
+  );
+});
+
+const logout = asyncHandler(async (req, res) => {
+  await UserModel.findByIdAndUpdate(
+    req.user._id,
+    {
+      refreshToken: null,
+    },
+    { new: true }
+  );
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Logged out successfully"));
+});
+
 export {
   addAdmin,
-  addHelper,
-  addCM,
-  addTailor,
-  updateEmployee,
-  updateCustomer,
-  updateClothingItem,
-  updateMeasurement,
-  getCustomer,
-  getCustomerProfile,
-  getCustomers,
-  getEmployee,
-  getEmployees,
-  getCustomerBills,
-  getAnalytics,
+  addEmployee,
   addClothingItem,
   addMeasurement,
   addSoldBill,
   addStitchBill,
+  addWorkForEmployee,
+  addAdvanceForEmployee,
+  updateEmployee,
+  updateCustomer,
+  updateClothingItem,
+  updateMeasurement,
+  changePassword,
+  getCustomer,
+  getCustomerProfile,
+  getCustomers,
+  getEmployees,
+  getCustomerBills,
+  getAnalytics,
+  getEmployeeProfile,
+  login,
+  logout,
 };
-
-[
-  {
-    $match: {
-      year: 2024,
-    },
-  },
-  {
-    $addFields: {
-      monthlyData: {
-        $filter: {
-          input: "$monthlyData",
-          as: "monthly",
-          cond: {
-            $eq: [
-              "$$monthly.month",
-              new Date()
-                .toLocaleString("default", {
-                  month: "long",
-                })
-                .slice(0, 3),
-            ],
-          },
-        },
-      },
-      dailyData: {
-        $filter: {
-          input: "$dailyData",
-          as: "daily",
-          cond: {
-            $regexMatch: {
-              input: "$$daily.date",
-              regex: /\d\/\d2\/2024/gm,
-            },
-          },
-        },
-      },
-    },
-  },
-];

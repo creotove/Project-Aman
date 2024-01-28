@@ -9,10 +9,6 @@ const helperSchema = new mongoose.Schema({
     type: mongoose.SchemaTypes.ObjectId,
     ref: "user",
   },
-  phoneNumber: {
-    type: Number,
-    required: [true, "Phone number is required"],
-  },
   monthly: {
     type: Number,
     required: [true, "Monthly income is required"],
