@@ -90,6 +90,40 @@ async function generateAccessAndRefreshToken(userId) {
     throw new ApiError(500, "Something went wrong while generating tokens");
   }
 }
+// Utility function for creatingCustomer
+async function createCustomer(name, phoneNumber) {
+  try {
+    const salt = await bcryptjs.genSalt(10);
+    const hashedPassword = await bcryptjs.hash(phoneNumber.toString(), salt);
+
+    const newUser = await UserModel.create({
+      name,
+      phoneNumber,
+      role: "CUSTOMER",
+      password: hashedPassword,
+    });
+    if (!newUser)
+      throw new ApiError(500, "Something went wrong while creating the user");
+    const newCustomer = await CustomerModel.create({
+      name,
+      user_id: newUser._id,
+    });
+    if (!newCustomer)
+      throw new ApiError(
+        500,
+        "Something went wrong while creating the customer"
+      );
+    await newUser.save();
+    await newCustomer.save();
+    return {
+      newUser,
+      newCustomer,
+    };
+  } catch (error) {
+    throw new ApiError(500, "Something went wrong while creating customer");
+  }
+}
+
 // Utility function for regenerating the access token if it is expired - Middleware (May not be used)
 const refreshAccessToken = asyncHandler(async (req, res) => {
   const incomingRefreshToken = req.body.refreshToken;
@@ -460,7 +494,7 @@ const addClothingItem = asyncHandler(async (req, res) => {
       await cuttingMaster.save();
     }
   }
-  
+
   await newClothingItem.save();
   return res
     .status(201)
@@ -475,41 +509,97 @@ const addClothingItem = asyncHandler(async (req, res) => {
 
 const addMeasurement = asyncHandler(async (req, res) => {
   const { id } = req.params; // customer id
-  const { measurements, customerRequirements, name } = req.body;
+  let { measurements, customerRequirements, name } = req.body;
   if (measurements === undefined) {
     throw new ApiError(400, "Measurements are Required");
   } else if (id === undefined) {
     throw new ApiError(400, "Customer Id is Required");
+  } else if (name.trim() === undefined) {
+    throw new ApiError(400, "Name is Required");
+  } else if (customerRequirements === undefined) {
+    customerRequirements = [{ name: "No Req.", value: "", description: "" }];
   }
   const customer = await CustomerModel.findById(id);
   if (!customer) throw new ApiError(404, "Customer not found");
-  
-  const newMeasurements = await MeasurementModel.create({
+
+  const existedMeasurement = await MeasurementModel.findOne({
+    customer_id: id,
     name,
-    customer_id: id,
-    measurements,
-    customerRequirements: customerRequirements
-      ? customerRequirements
-      : [{ name: "No Req.", value: "", description: "" }],
   });
-  if (!newMeasurements)
-    throw new ApiError(500, "Something went wrong while creating the user");
-
-  const newMeasurementHistory = await MeasurementHistoryModel.create({
-    measurement_id: newMeasurements._id,
-    customer_id: id,
-  });
-
-  if (!newMeasurementHistory)
-  throw new ApiError(500, "Something went wrong while creating the user");
-  customer.measurements.push(newMeasurements._id);
-  await newMeasurementHistory.save();
-  await newMeasurements.save();
-  await customer.save();
+  if (!existedMeasurement) {
+    const newMeasurement = await MeasurementModel.create({
+      customer_id: id,
+      measurements,
+      customerRequirements,
+      name,
+    });
+    if (!newMeasurement)
+      throw new ApiError(500, "Something went wrong while creating the user");
+    customer.measurements.push(newMeasurement._id);
+    await customer.save();
+    await newMeasurement.save();
+  } else {
+    existedMeasurement.measurements = measurements;
+    existedMeasurement.customerRequirements = customerRequirements;
+    await existedMeasurement.save();
+  }
 
   return res
     .status(201)
-    .json(new ApiResponse(201, `Add Measurement for ${customer?.name} successfully`));
+    .json(
+      new ApiResponse(201, `Add Measurement for ${customer?.name} successfully`)
+    );
+});
+
+const checkMeasurements = asyncHandler(async (req, res) => {
+  const { name, phoneNumber, clothingItems } = req.body;
+
+  let user = await UserModel.findOne({ phoneNumber });
+  const measurmentsOccurred = new Map();
+  if (!user) {
+    const newCustomer = await createCustomer(name, phoneNumber);
+    if (!newCustomer)
+      throw new ApiError(500, "Something went wrong while creating customer");
+    for (const clothingItem of clothingItems) {
+      measurmentsOccurred.set(clothingItem, false);
+    }
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          {
+            customer_id: newCustomer._id,
+            ...Object.fromEntries(measurmentsOccurred),
+          },
+          "Measurements data found"
+        )
+      );
+  } else {
+    const customer = await CustomerModel.findOne({ user_id: user._id });
+    for (const clothingItem of clothingItems) {
+      const measurement = await MeasurementModel.findOne({
+        customer_id: customer._id,
+        name: clothingItem,
+      });
+      if (!measurement) {
+        measurmentsOccurred.set(clothingItem, false);
+      } else {
+        measurmentsOccurred.set(clothingItem, true);
+      }
+    }
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,{
+            customer_id: customer._id,
+            ...Object.fromEntries(measurmentsOccurred),
+          },
+          "Measurements data found"
+        )
+      );
+  }
 });
 
 const addSoldBill = asyncHandler(async (req, res) => {
@@ -520,38 +610,20 @@ const addSoldBill = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Phone number is Required");
   } else if (totalAmt === undefined) {
     throw new ApiError(400, "Total Amount is Required");
+  } else if (billNumber === undefined) {
+    throw new ApiError(400, "Bill Number is Required");
   }
 
   const user = await UserModel.findOne({ phoneNumber });
   if (!user) {
-    const salt = await bcryptjs.genSalt(10);
-    const hashedPassword = await bcryptjs.hash(phoneNumber.toString(), salt);
-
-    const newUser = await UserModel.create({
-      name,
-      phoneNumber,
-      role: "CUSTOMER",
-      password: hashedPassword,
-    });
-    if (!newUser)
-      throw new ApiError(500, "Something went wrong while creating the user");
-    const newCustomer = await CustomerModel.create({
-      name,
-      user_id: newUser._id,
-    });
-    if (!newCustomer)
-      throw new ApiError(
-        500,
-        "Something went wrong while creating the customer"
-      );
-    await newUser.save();
+    const { newCustomer, newUser } = await createCustomer(name, phoneNumber);
     const newSoldBill = await SoldBillModel.create({
       name,
       user_id: newUser._id,
       customer_id: newCustomer._id,
       phoneNumber,
       totalAmt,
-      billNumber: billNumber.billNumber + 1,
+      billNumber,
     });
     if (!newSoldBill)
       throw new ApiError(500, "Something went wrong while creating the user");
@@ -588,7 +660,7 @@ const addSoldBill = asyncHandler(async (req, res) => {
 
   return res
     .status(201)
-    .json(new ApiResponse(201, "Add Sold Bill for user successfully"));
+    .json(new ApiResponse(201, {}, "Add Sold Bill for user successfully"));
 });
 
 const addStitchBill = asyncHandler(async (req, res) => {
@@ -619,6 +691,10 @@ const addStitchBill = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Sub Total is Required");
   } else if (finalAmt === undefined) {
     throw new ApiError(400, "Final Amount is Required");
+  } else if (advanceAmt === undefined) {
+    throw new ApiError(400, "Advance Amount is Required");
+  } else if (billNumber === undefined) {
+    throw new ApiError(400, "Bill Number is Required");
   }
 
   // Check if the customer is already registered or not
@@ -626,36 +702,7 @@ const addStitchBill = asyncHandler(async (req, res) => {
 
   // If not registered then create a new customer
   if (!user) {
-    // Hash the password
-    const salt = await bcryptjs.genSalt(10);
-    const hashedPassword = await bcryptjs.hash(phoneNumber.toString(), salt);
-    if (!hashedPassword)
-      throw new ApiError(
-        500,
-        "Something went wrong while hashing the password"
-      );
-
-    // Create a new user
-    const newUser = await UserModel.create({
-      name,
-      phoneNumber,
-      role: "CUSTOMER",
-      password: hashedPassword,
-    });
-    if (!newUser)
-      throw new ApiError(500, "Something went wrong while creating the user");
-
-    // Create a new customer
-    const newCustomer = await CustomerModel.create({
-      name,
-      user_id: newUser._id,
-    });
-    if (!newCustomer) {
-      throw new ApiError(
-        500,
-        "Something went wrong while creating the customer"
-      );
-    }
+    const { newCustomer, newUser } = await createCustomer(name, phoneNumber);
 
     const newStitchBill = await StitchBillModel.create({
       name,
@@ -714,7 +761,9 @@ const addStitchBill = asyncHandler(async (req, res) => {
 
   return res
     .status(201)
-    .json(new ApiResponse(201, "Add Stitch Bill for customer successfully"));
+    .json(
+      new ApiResponse(201, {}, "Add Stitch Bill for customer successfully")
+    );
 });
 
 // Update || PATCH
@@ -1352,11 +1401,7 @@ const getAnalytics = asyncHandler(async (req, res) => {
             input: "$monthlyData",
             as: "monthly",
             cond: {
-              $eq: [
-                "$$monthly.month",
-                qMonthInString
-                
-              ],
+              $eq: ["$$monthly.month", qMonthInString],
             },
           },
         },
@@ -1497,6 +1542,37 @@ const getEmployeeProfile = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, employee[0], "Employee fetched successfull"));
 });
 
+const getClothingItems = asyncHandler(async (req, res) => {
+  const clothingItems = await ClothingModel.find().select("name -_id ");
+
+  if (!clothingItems) throw new ApiError(404, "Clothing Items not found");
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, clothingItems, "Clothing Items fetched successfully")
+    );
+});
+
+const getClothingItemMeasurementNames = asyncHandler(async (req, res) => {
+  const { name } = req.params;
+  if (name.trim() === undefined)
+    throw new ApiError(400, "Clothing Item name is required");
+
+  const clothingItem = await ClothingModel.findOne({ name });
+  if (!clothingItem) throw new ApiError(404, "Clothing Item not found");
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        clothingItem.measurements,
+        "Clothing Item measurement names fetched successfully"
+      )
+    );
+});
+
 // Auth || POST
 const login = asyncHandler(async (req, res) => {
   const { phoneNumber, password } = req.body;
@@ -1544,6 +1620,7 @@ export {
   addEmployee,
   addClothingItem,
   addMeasurement,
+  checkMeasurements,
   addSoldBill,
   addStitchBill,
   addWorkForEmployee,
@@ -1562,4 +1639,6 @@ export {
   getEmployeeProfile,
   login,
   logout,
+  getClothingItems,
+  getClothingItemMeasurementNames,
 };

@@ -19,6 +19,9 @@ import {
   changePassword,
   addWorkForEmployee,
   addAdvanceForEmployee,
+  checkMeasurements,
+  getClothingItemMeasurementNames,
+  getClothingItems,
 } from "../controllers/adminCtrls.js";
 import { upload } from "../middlewares/multer.js";
 import { addBillNumber } from "../middlewares/billNumber.js";
@@ -60,6 +63,8 @@ router.post("/addWork/:id", addWorkForEmployee); // -> /api/admin/addWork
 
 router.post("/addAdvance/:id", addAdvanceForEmployee); // -> /api/admin/addWork
 
+router.post("/checkMeasurements", checkMeasurements); // -> /api/admin/checkMeasurements
+
 // PATCH || Update
 router.patch(
   "/updateEmployee/:id",
@@ -92,6 +97,8 @@ router.get("/bills/:id", getCustomerBills); // -> /api/admin/bills/:id
 router.get("/employees", getEmployees); // -> /api/admin/employees
 router.get("/employee/:id", getEmployeeProfile); // -> /api/admin/employees/:id
 router.get("/analytics", getAnalytics); // -> /api/admin/analytics
+router.get("/clothingItems", getClothingItems); // -> /api/admin/clothingItem/:id
+router.get("/clothingItemMeasurementNames/:name", getClothingItemMeasurementNames); // -> /api/admin/clothingItemMeasurementNames/:name
 
 // Authentication
 router.post("/login", login); // -> /api/admin/login
