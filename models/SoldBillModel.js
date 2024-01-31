@@ -10,7 +10,7 @@ const soldSchema = new mongoose.Schema(
       type: mongoose.SchemaTypes.ObjectId,
       ref: "user",
     },
-    customer_id :{
+    customer_id: {
       type: mongoose.SchemaTypes.ObjectId,
       ref: "customer",
     },
@@ -26,26 +26,6 @@ const soldSchema = new mongoose.Schema(
       type: Number,
       required: [true, "Total amount is required"],
     },
-    // clothes: [
-    //   {
-    //     clothName: {
-    //       type: String,
-    //       required: [true, "Cloth name is required"],
-    //     },
-    //     meter: {
-    //       type: Number,
-    //       required: [true, "Meter is required"],
-    //     },
-    //     perMtr: {
-    //       type: Number,
-    //       required: [true, "Per mtr amt is required"],
-    //     },
-    //     totalClothAmt: {
-    //       type: Number,
-    //       required: [true, "Total cloth amt is required"],
-    //     },
-    //   },
-    // ],
   },
   { timestamps: true }
 );

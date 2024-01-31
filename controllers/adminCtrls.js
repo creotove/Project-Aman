@@ -14,7 +14,6 @@ import ClothingModel from "../models/ClothingModel.js";
 import TailorModel from "../models/TailorModel.js";
 import MeasurementModel from "../models/MeasurementModel.js";
 import CustomerModel from "../models/CustomerModel.js";
-import MeasurementHistoryModel from "../models/MeasurementHistoryModel.js";
 import SoldBillModel from "../models/SoldBillModel.js";
 import StitchBillModel from "../models/StitchBillModel.js";
 import { analyticsAdd } from "../utils/analyticsAdd.js";
@@ -22,16 +21,22 @@ import mongoose from "mongoose";
 import AnalyticsModel from "../models/AnalyticsModel.js";
 import WorkModel from "../models/WorkModel.js";
 
+import { pipeline } from "../constants/index.js";
+
 // Utility function for pagination
 function paginatedData(Model) {
   return async (req, res) => {
-    const page = parseInt(req.query.page);
-    const limit = parseInt(req.query.limit);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
     const startIndex = (page - 1) * limit;
     const endIndex = page * limit;
     const results = {};
     try {
-      if (endIndex < (await Model.countDocuments().exec())) {
+      const resultsCount = await Model.countDocuments().exec();
+      if (resultsCount <= 0) {
+        throw new ApiError(404, "No data found");
+      }
+      if (endIndex < resultsCount) {
         results.next = {
           page: page + 1,
           limit: limit,
@@ -40,6 +45,13 @@ function paginatedData(Model) {
       if (startIndex > 0) {
         results.previous = {
           page: page - 1,
+          limit: limit,
+        };
+      }
+      console.log(resultsCount, limit, startIndex, endIndex);
+      if (resultsCount <= limit) {
+        results.totalPages = {
+          page: 1,
           limit: limit,
         };
       }
@@ -563,18 +575,16 @@ const checkMeasurements = asyncHandler(async (req, res) => {
     for (const clothingItem of clothingItems) {
       measurmentsOccurred.set(clothingItem, false);
     }
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(
-          200,
-          {
-            customer_id: newCustomer._id,
-            ...Object.fromEntries(measurmentsOccurred),
-          },
-          "Measurements data found"
-        )
-      );
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        {
+          customer_id: newCustomer._id,
+          ...Object.fromEntries(measurmentsOccurred),
+        },
+        "Measurements data found"
+      )
+    );
   } else {
     const customer = await CustomerModel.findOne({ user_id: user._id });
     for (const clothingItem of clothingItems) {
@@ -588,17 +598,16 @@ const checkMeasurements = asyncHandler(async (req, res) => {
         measurmentsOccurred.set(clothingItem, true);
       }
     }
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(
-          200,{
-            customer_id: customer._id,
-            ...Object.fromEntries(measurmentsOccurred),
-          },
-          "Measurements data found"
-        )
-      );
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        {
+          customer_id: customer._id,
+          ...Object.fromEntries(measurmentsOccurred),
+        },
+        "Measurements data found"
+      )
+    );
   }
 });
 
@@ -962,71 +971,125 @@ const changePassword = asyncHandler(async (req, res) => {
 });
 
 // Retrive || GET
-const getCustomer = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const { name, phoneNumber } = req.params;
-  const cust = await CustomerModel.findOne({
-    $or: [{ _id: id }, { name }, { phoneNumber }],
-  }).populate("stitchedBill purchasedBill");
-  if (!cust) throw new ApiError(404, "Customer not found");
-  const user = await UserModel.findById(cust.user_id)
-    .select("avatar phoneNumber")
-    .lean();
-  if (!user) throw new ApiError(404, "User not found");
-  const customer = {
-    _id: cust._id,
-    name: cust.name,
-    phoneNumber: user.phoneNumber,
-    avatar: user.avatar,
-    stitchedBill: cust.stitchedBill,
-    purchasedBill: cust.purchasedBill,
-  };
+const getCustomers = asyncHandler(async (req, res) => {
+  const name = req.query.name || "";
+  const phoneNumber = Number(req.query.phoneNumber) || 0;
 
+  const customer = await UserModel.aggregate([
+    {
+      $match: {
+        role: "CUSTOMER",
+        $or: [{ name }, { phoneNumber }],
+      },
+    },
+    {
+      $lookup: {
+        from: "customers",
+        localField: "_id",
+        foreignField: "user_id",
+        as: "customerDetails",
+        pipeline: [
+          {
+            $project: {
+              _id: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $addFields: {
+        customer_id: {
+          $arrayElemAt: ["$customerDetails._id", 0],
+        },
+      },
+    },
+    {
+      $project: {
+        _id: 1,
+        customer_id: 1,
+        name: 1,
+        phoneNumber: 1,
+        avatar: 1,
+      },
+    },
+  ]);
+  if (!customer) throw new ApiError(404, "Customer not found");
   return res
     .status(200)
-    .json(new ApiResponse(200, customer, "Customer Retrived Successfully"));
+    .json(new ApiResponse(200, customer, "Customers Retrived Successfully"));
 });
 
-const getCustomers = asyncHandler(async (req, res) => {
-  // const { page, limit } = req.query;
-  // const customers = await CustomerModel.find();
-  // const totalCustomers = customers.length;
-  // const startIndex = (page - 1) * limit ? limit : 10;
-  // const endIndex = page * limit ? limit : 10;
-  // const results = {};
-  // if (endIndex < totalCustomers) {
-  //   results.next = {
-  //     page: page + 1,
-  //     limit: limit ? limit : 10,
-  //   };
-  // }
-  // if (startIndex > 0) {
-  //   results.previous = {
-  //     page: page - 1,
-  //     limit: limit ? limit : 10,
-  //   };
-  // }
-  // results.totalCustomers = totalCustomers;
-  // results.results = await CustomerModel.find()
-  //   .sort({ createdAt: -1 })
-  //   .limit(limit ? limit : 10)
-  //   .skip(startIndex);
-  await paginatedData(CustomerModel)(req, res);
-  console.log(res.paginatedResults);
+const getSoldCustomersList = asyncHandler(async (req, res) => {
+  const page = parseInt(req.query.page) || 1; // pageNumber
+  const limit = parseInt(req.query.limit) || 10; // limit
+
+  const totalResultsPipeline = [...pipeline, { $count: "results" }];
+  const [totalResultsCount] = await SoldBillModel.aggregate(
+    totalResultsPipeline
+  );
+
+  const resultPipeline = [
+    ...pipeline,
+    {
+      $skip: (page - 1) * limit,
+    },
+    {
+      $limit: limit,
+    },
+  ];
+
+  const customerList = await SoldBillModel.aggregate(resultPipeline);
+
+  const result = {
+    results: totalResultsCount ? totalResultsCount.results : 0,
+    page,
+    limit: limit,
+    data: customerList,
+  };
+
+  if (!result) throw new ApiError(404, "Customer not found");
   return res
     .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        res.paginatedResults,
-        "Customers Retrived Successfully"
-      )
-    );
+    .json(new ApiResponse(200, result, "Customers Retrived Successfully"));
+});
+const getStitchCustomersList = asyncHandler(async (req, res) => {
+  const page = parseInt(req.query.page) || 1; // pageNumber
+  const limit = parseInt(req.query.limit) || 10; // limit
+
+  const totalResultsPipeline = [...pipeline, { $count: "results" }];
+  const [totalResultsCount] = await StitchBillModel.aggregate(
+    totalResultsPipeline
+  );
+
+  const resultPipeline = [
+    ...pipeline,
+    {
+      $skip: (page - 1) * limit,
+    },
+    {
+      $limit: limit,
+    },
+  ];
+
+  const customerList = await StitchBillModel.aggregate(resultPipeline);
+
+  const result = {
+    results: totalResultsCount ? totalResultsCount.results : 0,
+    page,
+    limit: limit,
+    data: customerList,
+  };
+
+  if (!result) throw new ApiError(404, "Customer not found");
+  return res
+    .status(200)
+    .json(new ApiResponse(200, result, "Customers Retrived Successfully"));
 });
 
 const getCustomerProfile = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const limit = parseInt(req.query.limit) || 10; // pageSize
+  const limit = parseInt(req.query.limit) || 10; // limit
   const page = parseInt(req.query.page) || 1; // pageNumber
   if (id === undefined) {
     throw new ApiError(404, "Id is required to fetch the customer");
@@ -1208,7 +1271,7 @@ const getCustomerProfile = asyncHandler(async (req, res) => {
 
 const getCustomerBills = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const limit = parseInt(req.query.limit) || 10; // pageSize
+  const limit = parseInt(req.query.limit) || 10; // limit
   const page = parseInt(req.query.page) || 1; // pageNumber
   if (id === undefined) {
     throw new ApiError(404, "Id is required to fetch the customer");
@@ -1457,7 +1520,7 @@ const getEmployees = asyncHandler(async (req, res) => {
 const getEmployeeProfile = asyncHandler(async (req, res) => {
   const { id } = req.params; // user id
   let qrole = req.query.role;
-  const limit = parseInt(req.query.limit) || 2; // pageSize
+  const limit = parseInt(req.query.limit) || 2; // limit
   const page = parseInt(req.query.page) || 1; // pageNumber
   if (qrole === "CM") {
     qrole = "cuttingmaster";
@@ -1630,8 +1693,9 @@ export {
   updateClothingItem,
   updateMeasurement,
   changePassword,
-  getCustomer,
   getCustomerProfile,
+  getSoldCustomersList,
+  getStitchCustomersList,
   getCustomers,
   getEmployees,
   getCustomerBills,

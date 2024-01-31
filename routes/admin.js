@@ -22,6 +22,8 @@ import {
   checkMeasurements,
   getClothingItemMeasurementNames,
   getClothingItems,
+  getSoldCustomersList,
+  getStitchCustomersList,
 } from "../controllers/adminCtrls.js";
 import { upload } from "../middlewares/multer.js";
 import { addBillNumber } from "../middlewares/billNumber.js";
@@ -92,6 +94,8 @@ router.patch("/changePassword", auth, changePassword); // -> /api/admin/changePa
 
 // GET || Read
 router.get("/customers", getCustomers); // -> /api/admin/customers
+router.get("/stitchCustomerList", getStitchCustomersList); // -> /api/admin/customers
+router.get("/soldCustomerList", getSoldCustomersList); // -> /api/admin/customers
 router.get("/customer/:id", getCustomerProfile); // -> /api/admin/customer/:id
 router.get("/bills/:id", getCustomerBills); // -> /api/admin/bills/:id
 router.get("/employees", getEmployees); // -> /api/admin/employees
