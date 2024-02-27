@@ -20,8 +20,6 @@ import { analyticsAdd } from "../utils/analyticsAdd.js";
 import mongoose from "mongoose";
 import AnalyticsModel from "../models/AnalyticsModel.js";
 import WorkModel from "../models/WorkModel.js";
-import MoneyDistributionModel from "../models/MoneyDistributionModel.js";
-
 import { pipeline } from "../constants/index.js";
 
 // Utility function for pagination

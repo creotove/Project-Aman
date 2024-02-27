@@ -8,7 +8,6 @@ import {
   addStitchBill,
   updateEmployee,
   updateCustomer,
-  getCustomers,
   getEmployees,
   getCustomerProfile,
   getCustomerBills,
@@ -24,6 +23,9 @@ import {
   getClothingItems,
   getSoldCustomersList,
   getStitchCustomersList,
+  getWork,
+  giveMoneyToEmployee,
+  searchCustomer,
 } from "../controllers/adminCtrls.js";
 import { upload } from "../middlewares/multer.js";
 import { addBillNumber } from "../middlewares/billNumber.js";
@@ -67,6 +69,8 @@ router.post("/addAdvance/:id", addAdvanceForEmployee); // -> /api/admin/addWork
 
 router.post("/checkMeasurements", checkMeasurements); // -> /api/admin/checkMeasurements
 
+router.post("/giveMoneyToEmployee/:id", giveMoneyToEmployee); // -> /api/admin/giveMoneyToEmployee?role=TAILOR
+
 // PATCH || Update
 router.patch(
   "/updateEmployee/:id",
@@ -93,13 +97,14 @@ router.patch(
 router.patch("/changePassword", auth, changePassword); // -> /api/admin/changePassword
 
 // GET || Read
-router.get("/customers", getCustomers); // -> /api/admin/customers
+router.get("/customer", searchCustomer); // -> /api/admin/customer?name=abc&phoneNumber=123
 router.get("/stitchCustomerList", getStitchCustomersList); // -> /api/admin/customers
 router.get("/soldCustomerList", getSoldCustomersList); // -> /api/admin/customers
 router.get("/customer/:id", getCustomerProfile); // -> /api/admin/customer/:id
 router.get("/bills/:id", getCustomerBills); // -> /api/admin/bills/:id
 router.get("/employees", getEmployees); // -> /api/admin/employees
 router.get("/employee/:id", getEmployeeProfile); // -> /api/admin/employees/:id
+router.get("/work/:id", getWork); // -> /api/admin/employees/:id
 router.get("/analytics", getAnalytics); // -> /api/admin/analytics
 router.get("/clothingItems", getClothingItems); // -> /api/admin/clothingItem/:id
 router.get("/clothingItemMeasurementNames/:name", getClothingItemMeasurementNames); // -> /api/admin/clothingItemMeasurementNames/:name

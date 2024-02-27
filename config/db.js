@@ -4,7 +4,7 @@ const connectDB = async () => {
   try {
     let mongoURL;
     if (process.env.NODE_ENV === "production") {
-      mongoURL = process.env.MONGO_URI + "/Aman";
+      mongoURL = process.env.MONGODB_URI + "/Aman";
       console.log('Connected to production');
     } else {
       mongoURL = "mongodb://localhost:27017/tryingNew";
