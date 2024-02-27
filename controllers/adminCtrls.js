@@ -20,6 +20,7 @@ import { analyticsAdd } from "../utils/analyticsAdd.js";
 import mongoose from "mongoose";
 import AnalyticsModel from "../models/AnalyticsModel.js";
 import WorkModel from "../models/WorkModel.js";
+import MoneyDistributionModel from "../models/MoneyDistributionModel.js";
 
 import { pipeline } from "../constants/index.js";
 
@@ -775,6 +776,52 @@ const addStitchBill = asyncHandler(async (req, res) => {
     );
 });
 
+const giveMoneyToEmployee = asyncHandler(async (req, res) => {
+  const { id } = req.params; // employee id
+  const { role } = req.query;
+  const { amount } = req.body;
+  if (id === undefined) throw new ApiError(400, "User Id is Required");
+  if (amount === undefined) throw new ApiError(400, "Amount is Required");
+
+  let employee;
+  if (role === "HELPER") {
+    employee = await HelperModel.findById(id);
+    if (!employee) throw new ApiError(404, "Helper not found");
+  } else if (role === "CM") {
+    employee = await CuttingMasterModel.findById(id);
+    if (!employee) throw new ApiError(404, "Cutting Master not found");
+  } else if (role === "TAILOR") {
+    employee = await TailorModel.findById(id);
+    if (!employee) throw new ApiError(404, "Tailor not found");
+  } else {
+    throw new ApiError(400, "Role is not valid");
+  }
+  const moneyDistribution = await MoneyDistributionModel.create({
+    employee_id: employee._id,
+    name: employee.name,
+    amount,
+    message: "Salary/Fees",
+  });
+  if (!moneyDistribution)
+    throw new ApiError(500, "Something went wrong while creating the user");
+
+  if (employee.role !== "HELPER") {
+    if (amount <= employee.earned) {
+      employee.earned -= amount;
+    } else {
+      employee.advance = employee.advance + (amount - employee.earned);
+      employee.earned = 0;
+    }
+  }
+
+  await employee.save();
+  await moneyDistribution.save();
+
+  return res
+    .status(201)
+    .json(new ApiResponse(201, {}, "Money given to employee successfully"));
+});
+
 // Update || PATCH
 // Employee Details || AVATAR middleware needed
 // *work and their amounts are not updated here
@@ -971,15 +1018,18 @@ const changePassword = asyncHandler(async (req, res) => {
 });
 
 // Retrive || GET
-const getCustomers = asyncHandler(async (req, res) => {
-  const name = req.query.name || "";
+const searchCustomer = asyncHandler(async (req, res) => {
   const phoneNumber = Number(req.query.phoneNumber) || 0;
+
+  if (phoneNumber === 0)
+    throw new ApiError(400, "Name or Phone Number is required");
 
   const customer = await UserModel.aggregate([
     {
       $match: {
         role: "CUSTOMER",
-        $or: [{ name }, { phoneNumber }],
+        phoneNumber,
+        // $or: [{ name }, { phoneNumber }],
       },
     },
     {
@@ -1014,10 +1064,10 @@ const getCustomers = asyncHandler(async (req, res) => {
       },
     },
   ]);
-  if (!customer) throw new ApiError(404, "Customer not found");
+  if (!customer[0]) throw new ApiError(404, "Customer not found");
   return res
     .status(200)
-    .json(new ApiResponse(200, customer, "Customers Retrived Successfully"));
+    .json(new ApiResponse(200, customer[0], "Customers Retrived Successfully"));
 });
 
 const getSoldCustomersList = asyncHandler(async (req, res) => {
@@ -1113,6 +1163,7 @@ const getCustomerProfile = asyncHandler(async (req, res) => {
             $project: {
               _id: 0,
               avatar: 1,
+              phoneNumber: 1,
             },
           },
         ],
@@ -1129,6 +1180,9 @@ const getCustomerProfile = asyncHandler(async (req, res) => {
         },
         avatar: {
           $arrayElemAt: ["$userDetails.avatar", 0],
+        },
+        phoneNumber: {
+          $arrayElemAt: ["$userDetails.phoneNumber", 0],
         },
       },
     },
@@ -1211,6 +1265,7 @@ const getCustomerProfile = asyncHandler(async (req, res) => {
         stitchedBillCount: { $first: "$stitchedBillCount" },
         purchasedBillCount: { $first: "$purchasedBillCount" },
         avatar: { $first: "$avatar" },
+        phoneNumber: { $first: "$phoneNumber" },
         measurements: { $first: "$measurements" },
         recentBill: { $push: "$recentBill" }, // Push all sorted recentBill documents into an array
       },
@@ -1261,7 +1316,7 @@ const getCustomerProfile = asyncHandler(async (req, res) => {
       },
     },
   ]);
-  if (!customer) throw new ApiError(404, "Customer not found");
+  if (!customer[0]) throw new ApiError(404, "Customer not found");
   return res
     .status(200)
     .json(
@@ -1606,15 +1661,24 @@ const getEmployeeProfile = asyncHandler(async (req, res) => {
 });
 
 const getClothingItems = asyncHandler(async (req, res) => {
-  const clothingItems = await ClothingModel.find().select("name -_id ");
-
+  const clothingItems = await ClothingModel.find();
   if (!clothingItems) throw new ApiError(404, "Clothing Items not found");
-
   return res
     .status(200)
     .json(
       new ApiResponse(200, clothingItems, "Clothing Items fetched successfully")
     );
+});
+
+const getWork = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  if (!id) throw new ApiError(400, "Id is required");
+  const work = await WorkModel.findById(id);
+  if (!work) throw new ApiError(404, "Work not found");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, work, "Work fetched successfully"));
 });
 
 const getClothingItemMeasurementNames = asyncHandler(async (req, res) => {
@@ -1688,6 +1752,7 @@ export {
   addStitchBill,
   addWorkForEmployee,
   addAdvanceForEmployee,
+  giveMoneyToEmployee,
   updateEmployee,
   updateCustomer,
   updateClothingItem,
@@ -1696,11 +1761,12 @@ export {
   getCustomerProfile,
   getSoldCustomersList,
   getStitchCustomersList,
-  getCustomers,
+  searchCustomer,
   getEmployees,
   getCustomerBills,
   getAnalytics,
   getEmployeeProfile,
+  getWork,
   login,
   logout,
   getClothingItems,
