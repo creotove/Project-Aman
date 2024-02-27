@@ -260,7 +260,7 @@ const addEmployee = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Role is Required");
   } else if (aadharnumber === undefined) {
     throw new ApiError(400, "Aadhar number is Required");
-  } else if (monthly === undefined) {
+  } else if (role === 'HELPER' && monthly === undefined) {
     throw new ApiError(400, "Monthly income is Required");
   }
 
