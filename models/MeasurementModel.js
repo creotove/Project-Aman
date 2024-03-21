@@ -14,7 +14,7 @@ const measurementSchema = new mongoose.Schema(
     measurements: {
       type: Map,
       of: {
-        type: Number,
+        type: String,
       },
       default: {},
     },
@@ -46,19 +46,19 @@ export default MeasurementModel;
 //       length: 10,
 //     },
 //   },
-  // {
-  //   name: "Pant",
-  //   customer_id: "5f8d0f3a2f6c4d3e8c5f9d8b",
-  //   measurements: {
-  //    Length: 10,
-  //    Wasit: 10,
-  //    Hip: 10,
-  //    Thigh: 10,
-  //    Knee: 10,
-  //    Ankle: 10
-  //   },
-  //   ],
-  // },
+// {
+//   name: "Pant",
+//   customer_id: "5f8d0f3a2f6c4d3e8c5f9d8b",
+//   measurements: {
+//    Length: 10,
+//    Wasit: 10,
+//    Hip: 10,
+//    Thigh: 10,
+//    Knee: 10,
+//    Ankle: 10
+//   },
+//   ],
+// },
 //   {
 //     name: "Blazer",
 //     customer_id: "5f8d0f3a2f6c4d3e8c5f9d8b",

@@ -260,7 +260,7 @@ const addEmployee = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Role is Required");
   } else if (aadharnumber === undefined) {
     throw new ApiError(400, "Aadhar number is Required");
-  } else if (role === 'HELPER' && monthly === undefined) {
+  } else if (role === "HELPER" && monthly === undefined) {
     throw new ApiError(400, "Monthly income is Required");
   }
 
@@ -520,15 +520,13 @@ const addClothingItem = asyncHandler(async (req, res) => {
 
 const addMeasurement = asyncHandler(async (req, res) => {
   const { id } = req.params; // customer id
-  let { measurements, customerRequirements, name } = req.body;
+  let { measurements,  name } = req.body;
   if (measurements === undefined) {
     throw new ApiError(400, "Measurements are Required");
   } else if (id === undefined) {
     throw new ApiError(400, "Customer Id is Required");
   } else if (name.trim() === undefined) {
     throw new ApiError(400, "Name is Required");
-  } else if (customerRequirements === undefined) {
-    customerRequirements = [{ name: "No Req.", value: "", description: "" }];
   }
   const customer = await CustomerModel.findById(id);
   if (!customer) throw new ApiError(404, "Customer not found");
@@ -541,7 +539,6 @@ const addMeasurement = asyncHandler(async (req, res) => {
     const newMeasurement = await MeasurementModel.create({
       customer_id: id,
       measurements,
-      customerRequirements,
       name,
     });
     if (!newMeasurement)
@@ -551,7 +548,6 @@ const addMeasurement = asyncHandler(async (req, res) => {
     await newMeasurement.save();
   } else {
     existedMeasurement.measurements = measurements;
-    existedMeasurement.customerRequirements = customerRequirements;
     await existedMeasurement.save();
   }
 
@@ -562,17 +558,89 @@ const addMeasurement = asyncHandler(async (req, res) => {
     );
 });
 
+// const checkMeasurements = asyncHandler(async (req, res) => {
+//   const { name, phoneNumber, clothingItems } = req.body;
+
+//   let user = await UserModel.findOne({ phoneNumber });
+//   const measurmentsOccurred = new Map();
+//   const measurements = [];
+//   if (!user) {
+//     const newCustomer = await createCustomer(name, phoneNumber);
+//     if (!newCustomer)
+//       throw new ApiError(500, "Something went wrong while creating customer");
+//     for (const clothingItem of clothingItems) {
+//       measurmentsOccurred.set(clothingItem, false);
+//     }
+//     return res.status(200).json(
+//       new ApiResponse(
+//         200,
+//         {
+//           customer_id: newCustomer._id,
+//           ...Object.fromEntries(measurmentsOccurred),
+//           measurements,
+//         },
+//         "Measurements data found"
+//       )
+//     );
+//   } else {
+//     const customer = await CustomerModel.findOne({ user_id: user._id });
+//     for (const clothingItem of clothingItems) {
+//       const measurement = await MeasurementModel.findOne({
+//         customer_id: customer._id,
+//         name: clothingItem,
+//       }).select(
+//         "-_id -customer_id -createdAt -updatedAt -__v -customer_id -customerRequirements"
+//       );
+//       if (!measurement) {
+//         measurmentsOccurred.set(clothingItem, false);
+//         const clothingItemDetails = await ClothingModel.findOne({
+//           name: clothingItem,
+//         });
+//         if (!clothingItemDetails)
+//           throw new ApiError(404, "Clothing Item not found");
+//         measurements.push({
+//           name: clothingItem,
+//           measurements: clothingItemDetails.measurements,
+//         });
+//       } else {
+//         measurements.push(measurement);
+//         measurmentsOccurred.set(clothingItem, true);
+//       }
+//     }
+//     return res.status(200).json(
+//       new ApiResponse(
+//         200,
+//         {
+//           customer_id: customer._id,
+//           ...Object.fromEntries(measurmentsOccurred),
+//           measurements,
+//         },
+//         "Measurements data found"
+//       )
+//     );
+//   }
+// });
+
 const checkMeasurements = asyncHandler(async (req, res) => {
   const { name, phoneNumber, clothingItems } = req.body;
 
   let user = await UserModel.findOne({ phoneNumber });
   const measurmentsOccurred = new Map();
+  const measurements = [];
+
   if (!user) {
-    const newCustomer = await createCustomer(name, phoneNumber);
-    if (!newCustomer)
+    const { newCustomer, newUser } = await createCustomer(name, phoneNumber);
+    if (!newCustomer && !newUser)
       throw new ApiError(500, "Something went wrong while creating customer");
     for (const clothingItem of clothingItems) {
       measurmentsOccurred.set(clothingItem, false);
+      const clothingItemDetails = await ClothingModel.findOne({ name: clothingItem });
+      if (!clothingItemDetails)
+        throw new ApiError(404, "Clothing Item not found");
+      measurements.push({
+        name: clothingItem,
+        measurements: getDefaultMeasurements(clothingItemDetails.measurements),
+      });
     }
     return res.status(200).json(
       new ApiResponse(
@@ -580,6 +648,7 @@ const checkMeasurements = asyncHandler(async (req, res) => {
         {
           customer_id: newCustomer._id,
           ...Object.fromEntries(measurmentsOccurred),
+          measurements,
         },
         "Measurements data found"
       )
@@ -590,10 +659,20 @@ const checkMeasurements = asyncHandler(async (req, res) => {
       const measurement = await MeasurementModel.findOne({
         customer_id: customer._id,
         name: clothingItem,
-      });
+      }).select(
+        "-_id -customer_id -createdAt -updatedAt -__v -customer_id -customerRequirements"
+      );
       if (!measurement) {
         measurmentsOccurred.set(clothingItem, false);
+        const clothingItemDetails = await ClothingModel.findOne({ name: clothingItem });
+        if (!clothingItemDetails)
+          throw new ApiError(404, "Clothing Item not found");
+        measurements.push({
+          name: clothingItem,
+          measurements: getDefaultMeasurements(clothingItemDetails.measurements),
+        });
       } else {
+        measurements.push(measurement);
         measurmentsOccurred.set(clothingItem, true);
       }
     }
@@ -603,12 +682,22 @@ const checkMeasurements = asyncHandler(async (req, res) => {
         {
           customer_id: customer._id,
           ...Object.fromEntries(measurmentsOccurred),
+          measurements,
         },
         "Measurements data found"
       )
     );
   }
 });
+
+// Function to get default measurements object with values set to 0
+const getDefaultMeasurements = (measurementNames) => {
+  const defaultMeasurements = {};
+  measurementNames.forEach(name => {
+    defaultMeasurements[name] = 0;
+  });
+  return defaultMeasurements;
+};
 
 const addSoldBill = asyncHandler(async (req, res) => {
   const { name, phoneNumber, totalAmt, billNumber } = req.body;
@@ -677,9 +766,7 @@ const addStitchBill = asyncHandler(async (req, res) => {
     phoneNumber,
     totalAmt,
     clothes,
-    clothAmt,
     deliveryDate,
-    subTotal,
     finalAmt,
     advanceAmt,
     billNumber,
@@ -695,9 +782,7 @@ const addStitchBill = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Clothes are Required");
   } else if (deliveryDate === undefined) {
     throw new ApiError(400, "Delivery Date is Required");
-  } else if (subTotal === undefined) {
-    throw new ApiError(400, "Sub Total is Required");
-  } else if (finalAmt === undefined) {
+  }  else if (finalAmt === undefined) {
     throw new ApiError(400, "Final Amount is Required");
   } else if (advanceAmt === undefined) {
     throw new ApiError(400, "Advance Amount is Required");
@@ -719,9 +804,7 @@ const addStitchBill = asyncHandler(async (req, res) => {
       phoneNumber,
       totalAmt,
       clothes,
-      clothAmt,
       deliveryDate,
-      subTotal,
       finalAmt,
       advanceAmt,
       billNumber,
@@ -736,7 +819,7 @@ const addStitchBill = asyncHandler(async (req, res) => {
   } else {
     const customer = await CustomerModel.findOne({ user_id: user._id });
     if (!customer)
-      throw new ApiError(500, "Something went wrong while creating the user");
+      throw new ApiError(404, "Customer not found");
 
     const newStitchBill = await StitchBillModel.create({
       name,
@@ -745,9 +828,7 @@ const addStitchBill = asyncHandler(async (req, res) => {
       phoneNumber,
       totalAmt,
       clothes,
-      clothAmt,
       deliveryDate,
-      subTotal,
       finalAmt,
       advanceAmt,
       billNumber,
@@ -1317,9 +1398,7 @@ const getCustomerProfile = asyncHandler(async (req, res) => {
   if (!customer[0]) throw new ApiError(404, "Customer not found");
   return res
     .status(200)
-    .json(
-      new ApiResponse(200, customer[0], "Customer fetched successfully try")
-    );
+    .json(new ApiResponse(200, customer[0], "Customer fetched successfully"));
 });
 
 const getCustomerBills = asyncHandler(async (req, res) => {

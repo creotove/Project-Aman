@@ -25,10 +25,6 @@ const stitchBillSchema = new mongoose.Schema(
       type: Date,
       required: [true, "Delivery date is required"],
     },
-    clothAmt: {
-      type: Number,
-      default: 0,
-    },
     clothes: [
       {
         clothName: {
@@ -49,10 +45,6 @@ const stitchBillSchema = new mongoose.Schema(
         },
       },
     ],
-    subTotal: {
-      type: Number,
-      required: [true, "Sub total amt is required"],
-    },
     advanceAmt: {
       type: Number,
       required: [true, "Advance amt is required"],

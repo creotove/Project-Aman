@@ -60,6 +60,10 @@ export const analyticsAdd = async (totalAmt, billType, customerType) => {
       analytics.profit += amountToadd;
       analytics.customers += customerType === "NEW" ? 1 : 0;
       analytics.newCustomers += customerType === "NEW" ? 1 : 0;
+      analytics.sales += billType === "STITCHED" ? 0 : amountToadd;
+      analytics.salesBillCount += billType === "STITCHED" ? 0 : 1;
+      analytics.stitch += billType === "STITCHED" ? amountToadd : 0;
+      analytics.stitchBillCount += billType === "STITCHED" ? 1 : 0;
       const month = new Date()
         .toLocaleString("default", { month: "long" })
         .slice(0, 3);
@@ -114,6 +118,7 @@ export const analyticsAdd = async (totalAmt, billType, customerType) => {
       await analytics.save();
     }
   } catch (error) {
+    console.log(error);
     throw new ApiError(500, error.message);
   }
 };
