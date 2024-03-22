@@ -283,13 +283,13 @@ const addEmployee = asyncHandler(async (req, res) => {
   if (!avatar) throw new ApiError(400, "Avatar is required");
 
   // Step 6
-  // unLinkFile(localpath)
-  //   .then((result) => {
-  //     console.log("Deletion result:", result);
-  //   })
-  //   .catch((error) => {
-  //     console.error("Deletion error:", error);
-  //   });
+  unLinkFile(localpath)
+    .then((result) => {
+      console.log("Deletion result:", result);
+    })
+    .catch((error) => {
+      console.error("Deletion error:", error);
+    });
 
   // Step 7
   const newUser = await UserModel.create({
