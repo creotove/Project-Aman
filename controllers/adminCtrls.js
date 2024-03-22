@@ -283,13 +283,13 @@ const addEmployee = asyncHandler(async (req, res) => {
   if (!avatar) throw new ApiError(400, "Avatar is required");
 
   // Step 6
-  unLinkFile(localpath)
-    .then((result) => {
-      console.log("Deletion result:", result);
-    })
-    .catch((error) => {
-      console.error("Deletion error:", error);
-    });
+  // unLinkFile(localpath)
+  //   .then((result) => {
+  //     console.log("Deletion result:", result);
+  //   })
+  //   .catch((error) => {
+  //     console.error("Deletion error:", error);
+  //   });
 
   // Step 7
   const newUser = await UserModel.create({
@@ -520,7 +520,7 @@ const addClothingItem = asyncHandler(async (req, res) => {
 
 const addMeasurement = asyncHandler(async (req, res) => {
   const { id } = req.params; // customer id
-  let { measurements,  name } = req.body;
+  let { measurements, name } = req.body;
   if (measurements === undefined) {
     throw new ApiError(400, "Measurements are Required");
   } else if (id === undefined) {
@@ -634,7 +634,9 @@ const checkMeasurements = asyncHandler(async (req, res) => {
       throw new ApiError(500, "Something went wrong while creating customer");
     for (const clothingItem of clothingItems) {
       measurmentsOccurred.set(clothingItem, false);
-      const clothingItemDetails = await ClothingModel.findOne({ name: clothingItem });
+      const clothingItemDetails = await ClothingModel.findOne({
+        name: clothingItem,
+      });
       if (!clothingItemDetails)
         throw new ApiError(404, "Clothing Item not found");
       measurements.push({
@@ -664,12 +666,16 @@ const checkMeasurements = asyncHandler(async (req, res) => {
       );
       if (!measurement) {
         measurmentsOccurred.set(clothingItem, false);
-        const clothingItemDetails = await ClothingModel.findOne({ name: clothingItem });
+        const clothingItemDetails = await ClothingModel.findOne({
+          name: clothingItem,
+        });
         if (!clothingItemDetails)
           throw new ApiError(404, "Clothing Item not found");
         measurements.push({
           name: clothingItem,
-          measurements: getDefaultMeasurements(clothingItemDetails.measurements),
+          measurements: getDefaultMeasurements(
+            clothingItemDetails.measurements
+          ),
         });
       } else {
         measurements.push(measurement);
@@ -693,7 +699,7 @@ const checkMeasurements = asyncHandler(async (req, res) => {
 // Function to get default measurements object with values set to 0
 const getDefaultMeasurements = (measurementNames) => {
   const defaultMeasurements = {};
-  measurementNames.forEach(name => {
+  measurementNames.forEach((name) => {
     defaultMeasurements[name] = 0;
   });
   return defaultMeasurements;
@@ -782,7 +788,7 @@ const addStitchBill = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Clothes are Required");
   } else if (deliveryDate === undefined) {
     throw new ApiError(400, "Delivery Date is Required");
-  }  else if (finalAmt === undefined) {
+  } else if (finalAmt === undefined) {
     throw new ApiError(400, "Final Amount is Required");
   } else if (advanceAmt === undefined) {
     throw new ApiError(400, "Advance Amount is Required");
@@ -818,8 +824,7 @@ const addStitchBill = asyncHandler(async (req, res) => {
     await newUser.save();
   } else {
     const customer = await CustomerModel.findOne({ user_id: user._id });
-    if (!customer)
-      throw new ApiError(404, "Customer not found");
+    if (!customer) throw new ApiError(404, "Customer not found");
 
     const newStitchBill = await StitchBillModel.create({
       name,
@@ -1040,14 +1045,20 @@ const updateCustomer = asyncHandler(async (req, res) => {
 
 const updateClothingItem = asyncHandler(async (req, res) => {
   const { id } = req.params; // clothing item id
-  const { name, stitching, defaultStitchingAmt, defaultCuttingAmt } = req.body;
+  const {
+    name,
+    stitchingAmtCustomer,
+    stitchingAmtTailor,
+    cuttingAmt,
+    measurements,
+  } = req.body;
   const clothingItem = await ClothingModel.findById(id);
   if (!clothingItem) throw new ApiError(404, "Clothing Item not found");
-  if (name) clothingItem.name = name;
-  if (stitching) clothingItem.defaultStitchingAmt = stitching;
-  if (defaultStitchingAmt)
-    clothingItem.defaultStitchingAmt = defaultStitchingAmt;
-  if (defaultCuttingAmt) clothingItem.defaultCuttingAmt = defaultCuttingAmt;
+  clothingItem.name = name;
+  clothingItem.stitchingAmtCustomer = stitchingAmtCustomer;
+  clothingItem.stitchingAmtTailor = stitchingAmtTailor;
+  clothingItem.cuttingAmt = cuttingAmt;
+  clothingItem.measurements = measurements;
   await clothingItem.save();
   return res
     .status(200)
@@ -1777,6 +1788,20 @@ const getClothingItemMeasurementNames = asyncHandler(async (req, res) => {
     );
 });
 
+// Delete || DELETE
+const deleteClothingItem = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  if (!id)
+    throw new ApiError(400, "Id is required to delete the clothing item");
+
+  const clothingItem = await ClothingModel.findByIdAndDelete(id);
+  if (!clothingItem) throw new ApiError(404, "Clothing Item not found");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Clothing Item deleted successfully"));
+});
+
 // Auth || POST
 const login = asyncHandler(async (req, res) => {
   const { phoneNumber, password } = req.body;
@@ -1848,4 +1873,5 @@ export {
   logout,
   getClothingItems,
   getClothingItemMeasurementNames,
+  deleteClothingItem,
 };

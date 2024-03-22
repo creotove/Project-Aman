@@ -26,6 +26,8 @@ import {
   getWork,
   giveMoneyToEmployee,
   searchCustomer,
+  deleteClothingItem,
+  updateClothingItem
 } from "../controllers/adminCtrls.js";
 import { upload } from "../middlewares/multer.js";
 import { addBillNumber } from "../middlewares/billNumber.js";
@@ -95,6 +97,7 @@ router.patch(
 ); // -> /api/admin/updateCustomer/:id
 
 router.patch("/changePassword", auth, changePassword); // -> /api/admin/changePassword
+router.patch('/clothingItem/:id', updateClothingItem); // -> /api/admin/clothingItem/:id
 
 // GET || Read
 router.get("/customer", searchCustomer); // -> /api/admin/customer?name=abc&phoneNumber=123
@@ -108,6 +111,9 @@ router.get("/work/:id", getWork); // -> /api/admin/employees/:id
 router.get("/analytics", getAnalytics); // -> /api/admin/analytics
 router.get("/clothingItems", getClothingItems); // -> /api/admin/clothingItem/:id
 router.get("/clothingItemMeasurementNames/:name", getClothingItemMeasurementNames); // -> /api/admin/clothingItemMeasurementNames/:name
+
+// DELETE || Delete
+router.delete('/deleteClothingItem/:id', deleteClothingItem); // -> /api/admin/deleteClothingItem/:id
 
 // Authentication
 router.post("/login", login); // -> /api/admin/login
