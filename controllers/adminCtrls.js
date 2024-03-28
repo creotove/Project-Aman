@@ -910,6 +910,42 @@ const giveMoneyToEmployee = asyncHandler(async (req, res) => {
     .json(new ApiResponse(201, {}, "Money given to employee successfully"));
 });
 
+const removeAdvanceFromEmployee = asyncHandler(async (req, res) => {
+  const { id } = req.params; // user id
+  const { amount } = req.body;
+
+  if (id === undefined) throw new ApiError(400, "User Id is Required");
+  if (amount === undefined) throw new ApiError(400, "Amount is Required");
+
+  const user = await UserModel.findById(id);
+  if (!user) throw new ApiError(404, "User not found");
+
+  let employee;
+  if (user.role === "HELPER") {
+    employee = await HelperModel.findOne({ user_id: id });
+    if (!employee) throw new ApiError(404, "Helper not found");
+  } else if (user.role === "CM") {
+    employee = await CuttingMasterModel.findOne({ user_id: id });
+    if (!employee) throw new ApiError(404, "Cutting Master not found");
+  } else if (user.role === "TAILOR") {
+    employee = await TailorModel.findOne({ user_id: id });
+    if (!employee) throw new ApiError(404, "Tailor not found");
+  } else {
+    throw new ApiError(400, "Role is not valid");
+  }
+  if (amount > employee.advance)
+    throw new ApiError(400, "Amount is greater than advance");
+  employee.advance -= amount;
+
+  await employee.save();
+
+  return res
+    .status(201)
+    .json(
+      new ApiResponse(201, {}, "Advance given money to employee received")
+    );
+});
+
 // Update || PATCH
 // Employee Details || AVATAR middleware needed
 // *work and their amounts are not updated here
@@ -1859,6 +1895,7 @@ export {
   addWorkForEmployee,
   addAdvanceForEmployee,
   giveMoneyToEmployee,
+  removeAdvanceFromEmployee,
   updateEmployee,
   updateCustomer,
   updateClothingItem,
