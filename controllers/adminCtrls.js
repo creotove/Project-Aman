@@ -21,6 +21,7 @@ import mongoose from "mongoose";
 import AnalyticsModel from "../models/AnalyticsModel.js";
 import WorkModel from "../models/WorkModel.js";
 import { pipeline } from "../constants/index.js";
+import MoneyDistributionModel from "../models/MoneyDistributionModel.js";
 
 // Utility function for pagination
 function paginatedData(Model) {
@@ -861,27 +862,30 @@ const addStitchBill = asyncHandler(async (req, res) => {
 });
 
 const giveMoneyToEmployee = asyncHandler(async (req, res) => {
-  const { id } = req.params; // employee id
-  const { role } = req.query;
+  const { id } = req.params; // user id
   const { amount } = req.body;
+
   if (id === undefined) throw new ApiError(400, "User Id is Required");
   if (amount === undefined) throw new ApiError(400, "Amount is Required");
 
+  const user = await UserModel.findById(id);
+  if (!user) throw new ApiError(404, "User not found");
+
   let employee;
-  if (role === "HELPER") {
-    employee = await HelperModel.findById(id);
+  if (user.role === "HELPER") {
+    employee = await HelperModel.findOne({ user_id: id });
     if (!employee) throw new ApiError(404, "Helper not found");
-  } else if (role === "CM") {
-    employee = await CuttingMasterModel.findById(id);
+  } else if (user.role === "CM") {
+    employee = await CuttingMasterModel.findOne({ user_id: id });
     if (!employee) throw new ApiError(404, "Cutting Master not found");
-  } else if (role === "TAILOR") {
-    employee = await TailorModel.findById(id);
+  } else if (user.role === "TAILOR") {
+    employee = await TailorModel.findOne({ user_id: id });
     if (!employee) throw new ApiError(404, "Tailor not found");
   } else {
     throw new ApiError(400, "Role is not valid");
   }
   const moneyDistribution = await MoneyDistributionModel.create({
-    employee_id: employee._id,
+    user_id: id,
     name: employee.name,
     amount,
     message: "Salary/Fees",
