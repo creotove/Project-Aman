@@ -22,6 +22,9 @@ import AnalyticsModel from "../models/AnalyticsModel.js";
 import WorkModel from "../models/WorkModel.js";
 import { pipeline } from "../constants/index.js";
 import MoneyDistributionModel from "../models/MoneyDistributionModel.js";
+import FabricModel from "../models/FabricModel.js";
+import WholeSalerModel from "../models/WholeSaler.js";
+import WholeSaleBillModel from "../models/WholeSaleBillModel.js";
 
 // Utility function for pagination
 function paginatedData(Model) {
@@ -941,9 +944,170 @@ const removeAdvanceFromEmployee = asyncHandler(async (req, res) => {
 
   return res
     .status(201)
-    .json(
-      new ApiResponse(201, {}, "Advance given money to employee received")
-    );
+    .json(new ApiResponse(201, {}, "Advance given money to employee received"));
+});
+
+const addFabricItem = asyncHandler(async (req, res) => {
+  const {
+    name,
+    purchasedPerMtrPrice,
+    sellingPerMtrPrice,
+    purchasedFrom,
+    description,
+    patternName,
+    stock,
+    totalMtrsWhenBought,
+  } = req.body;
+  if (name.trim() === "") {
+    throw new ApiError(400, "Name is Required");
+  } else if (purchasedPerMtrPrice === undefined) {
+    throw new ApiError(400, "Price Per Meter is Required");
+  } else if (sellingPerMtrPrice === undefined) {
+    throw new ApiError(400, "Price Per Meter is Required");
+  } else if (purchasedFrom.trim() === "") {
+    throw new ApiError(400, "Purchased From is Required");
+  } else if (description.trim() === "") {
+    throw new ApiError(400, "Description is Required");
+  } else if (patternName.trim() === "") {
+    throw new ApiError(400, "Pattern Name is Required");
+  } else if (stock === undefined) {
+    throw new ApiError(400, "Stock is Required");
+  } else if (totalMtrsWhenBought === undefined) {
+    throw new ApiError(400, "Total Meters When Bought is Required");
+  }
+  const existedFabricItem = await FabricModel.findOne({
+    $or: [{ name }, { patternName }],
+  });
+  if (existedFabricItem) {
+    throw new ApiError(409, "Fabric Item already exists");
+  }
+
+  const localpath = req.files?.image[0]?.path;
+  if (!localpath) throw new ApiError(400, "Fabric image is required");
+  const image = await uploadOnCloudinary(localpath);
+  if (!image) throw new ApiError(400, "Failed to uplaod image on cloudinary");
+
+  // Step 6
+  unLinkFile(localpath)
+    .then((result) => {
+      console.log("Deletion result:", result);
+    })
+    .catch((error) => {
+      console.error("Deletion error:", error);
+    });
+
+  const wholeSaler = await WholeSalerModel.findById(purchasedFrom);
+
+  const newFabricItem = await FabricModel.create({
+    name,
+    purchasedPerMtrPrice,
+    sellingPerMtrPrice,
+    image: image.url,
+    purchasedFrom,
+    wholeSalerName: wholeSaler.name,
+    description,
+    patternName,
+    stock,
+    totalMtrsWhenBought,
+    totalMtrsRemaining: totalMtrsWhenBought,
+  });
+
+  if (!newFabricItem)
+    throw new ApiError(500, "Something went wrong while creating the user");
+
+  await newFabricItem.save();
+
+  return res
+    .status(201)
+    .json(new ApiResponse(201, {}, "Fabric Item created successfully"));
+});
+
+const addWholeSaler = asyncHandler(async (req, res) => {
+  const { name, email, phone, address } = req.body;
+  if (name.trim() === "") {
+    throw new ApiError(400, "Name is Required");
+  } else if (email.trim() === "") {
+    throw new ApiError(400, "Email is Required");
+  } else if (phone === undefined) {
+    throw new ApiError(400, "Phone is Required");
+  } else if (address.trim() === "") {
+    throw new ApiError(400, "Address is Required");
+  }
+  const existedWholeSaler = await WholeSalerModel.findOne({
+    $or: [{ email }, { phone }],
+  });
+  if (existedWholeSaler) {
+    throw new ApiError(409, "Whole Saler already exists");
+  }
+
+  const newWholeSaler = await WholeSalerModel.create({
+    name,
+    email,
+    phone,
+    address,
+  });
+  if (!newWholeSaler)
+    throw new ApiError(500, "Something went wrong while creating the user");
+
+  await newWholeSaler.save();
+
+  return res
+    .status(201)
+    .json(new ApiResponse(201, {}, "Whole Saler created successfully"));
+});
+
+const addWholeSaleBill = asyncHandler(async (req, res) => {
+  const {
+    billNo,
+    totalAmount,
+    wholeSaler,
+    paymentStatus,
+    paymentDate,
+    payabeledAmount,
+    paidAmount,
+  } = req.body;
+
+  if (billNo === undefined) throw new ApiError(400, "Bill Number is Required");
+  else if (totalAmount === undefined)
+    throw new ApiError(400, "Total Amount is Required");
+  else if (wholeSaler === undefined)
+    throw new ApiError(400, "Whole Saler is Required");
+  else if (paymentStatus === undefined)
+    throw new ApiError(400, "Payment Status is Required");
+  else if (paymentDate === undefined)
+    throw new ApiError(400, "Payment Date is Required");
+  else if (payabeledAmount === undefined)
+    throw new ApiError(400, "Payabeled Amount is Required");
+  else if (paidAmount === undefined)
+    throw new ApiError(400, "Paid Amount is Required");
+
+  const localpath = req.files?.image[0]?.path;
+  if (!localpath) throw new ApiError(400, "Receipt image is required");
+  const receiptImage = await uploadOnCloudinary(localpath);
+  if (!receiptImage)
+    throw new ApiError(400, "Failed to uplaod image on cloudinary");
+
+  const wholeSalerName = await WholeSalerModel.findById(wholeSaler);
+
+  const newWholeSaleBill = await WholeSaleBillModel.create({
+    billNo,
+    totalAmount,
+    wholeSalerName: wholeSalerName.name,
+    wholeSaler,
+    paymentStatus,
+    paymentDate,
+    payabeledAmount,
+    paidAmount,
+    receiptImage: receiptImage.url,
+  });
+  if (!newWholeSaleBill)
+    throw new ApiError(500, "Something went wrong while creating the user");
+
+  await newWholeSaleBill.save();
+
+  return res
+    .status(201)
+    .json(new ApiResponse(201, {}, "Whole Sale Bill created successfully"));
 });
 
 // Update || PATCH
@@ -1053,6 +1217,46 @@ const updateEmployee = asyncHandler(async (req, res) => {
   }
 });
 
+const updateEmployeeProfile = asyncHandler(async (req, res) => {
+  const { id } = req.params; // user id
+  const { name, employeeDetails } = req.body;
+
+  const user = await UserModel.findById(id);
+  if (!user) throw new ApiError(404, "User not found");
+  if (name) user.name = name;
+
+  if (user.role === "TAILOR") {
+    const { employeeAmts: stitchingAmounts } = employeeDetails;
+    const tailor = await TailorModel.findOne({ user_id: id });
+
+    if (!tailor) throw new ApiError(404, "Tailor not found");
+    if (employeeDetails) tailor.stitchingAmounts = stitchingAmounts;
+
+    await tailor.save();
+  } else if (user.role === "CM") {
+    const { employeeAmts: cuttingAmounts } = employeeDetails;
+    const cuttingMaster = await CuttingMasterModel.findOne({ user_id: id });
+
+    if (!cuttingMaster) throw new ApiError(404, "Cutting Master not found");
+    if (employeeDetails) cuttingMaster.cuttingAmounts = cuttingAmounts;
+
+    await cuttingMaster.save();
+  } else if (user.role === "HELPER") {
+    const { employeeAmts: monthly } = employeeDetails;
+    const helper = await HelperModel.findOne({ user_id: id });
+
+    if (!helper) throw new ApiError(404, "Helper not found");
+    if (employeeDetails) helper.monthly = monthly.monthly;
+
+    await helper.save();
+  }
+  await user.save();
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Employee Updated Successfully"));
+});
+
 const updateCustomer = asyncHandler(async (req, res) => {
   const { id } = req.params; // customer id
   const { name, phoneNumber, avatar, password } = req.body;
@@ -1145,6 +1349,81 @@ const changePassword = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, {}, "Password changed successfully"));
+});
+
+const updateFabricItem = asyncHandler(async (req, res) => {
+  const { id } = req.params; // fabric item id
+  const {
+    name,
+    purchasedPerMtrPrice,
+    sellingPerMtrPrice,
+    purchasedFrom,
+    description,
+    patternName,
+    stock,
+    totalMtrsWhenBought,
+  } = req.body;
+  const fabricItem = await FabricModel.findById(id);
+  if (!fabricItem) throw new ApiError(404, "Fabric Item not found");
+  fabricItem.name = name;
+  fabricItem.purchasedPerMtrPrice = purchasedPerMtrPrice;
+  fabricItem.sellingPerMtrPrice = sellingPerMtrPrice;
+  fabricItem.purchasedFrom = purchasedFrom;
+  const wholeSaler = await WholeSalerModel.findById(purchasedFrom);
+  fabricItem.wholeSalerName = wholeSaler.name;
+  fabricItem.description = description;
+  fabricItem.patternName = patternName;
+  fabricItem.stock = stock;
+  fabricItem.totalMtrsWhenBought = totalMtrsWhenBought;
+  await fabricItem.save();
+  return res
+    .status(200)
+    .json(new ApiResponse(200, fabricItem, "Fabric Item Updated Successfully"));
+});
+
+const updateWholeSaler = asyncHandler(async (req, res) => {
+  const { id } = req.params; // whole saler id
+  const { name, email, phone, address } = req.body;
+  const wholeSaler = await WholeSalerModel.findById(id);
+  if (!wholeSaler) throw new ApiError(404, "Whole Saler not found");
+  wholeSaler.name = name;
+  wholeSaler.email = email;
+  wholeSaler.phone = phone;
+  wholeSaler.address = address;
+  await wholeSaler.save();
+  return res
+    .status(200)
+    .json(new ApiResponse(200, wholeSaler, "Whole Saler Updated Successfully"));
+});
+
+const updateWholeSaleBill = asyncHandler(async (req, res) => {
+  const { id } = req.params; // whole sale bill id
+  const {
+    billNo,
+    totalAmount,
+    paymentStatus,
+    paymentDate,
+    payabeledAmount,
+    paidAmount,
+  } = req.body;
+  const wholeSaleBill = await WholeSaleBillModel.findById(id);
+  if (!wholeSaleBill) throw new ApiError(404, "Whole Sale Bill not found");
+  wholeSaleBill.billNo = billNo;
+  wholeSaleBill.totalAmount = totalAmount;
+  wholeSaleBill.paymentStatus = paymentStatus;
+  wholeSaleBill.paymentDate = paymentDate;
+  wholeSaleBill.payabeledAmount = payabeledAmount;
+  wholeSaleBill.paidAmount = paidAmount;
+  await wholeSaleBill.save();
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        wholeSaleBill,
+        "Whole Sale Bill Updated Successfully"
+      )
+    );
 });
 
 // Retrive || GET
@@ -1828,6 +2107,208 @@ const getClothingItemMeasurementNames = asyncHandler(async (req, res) => {
     );
 });
 
+const getFabricItems = asyncHandler(async (req, res) => {
+  const limit = parseInt(req.query.limit) || 10; // limit
+  const page = parseInt(req.query.page) || 1; // pageNumber
+  const fabricItems = await FabricModel.find()
+    .select(
+      "name wholeSalerName purchasedFrom pricePerMeter sellingPerMtrPrice createdAt image"
+    )
+    .sort({ createdAt: -1 })
+    .skip((page - 1) * limit)
+    .limit(limit);
+  if (!fabricItems) res.status(404).json(new ApiResponse(404, {}, "Not Found"));
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, fabricItems, "Fabric Items fetched successfully")
+    );
+});
+
+const getWholeSalers = asyncHandler(async (req, res) => {
+  const limit = parseInt(req.query.limit) || 10; // limit
+  const page = parseInt(req.query.page) || 1; // pageNumber
+  const wholeSalers = await WholeSalerModel.find()
+    .select("name email phone")
+    .sort({ createdAt: -1 })
+    .skip((page - 1) * limit)
+    .limit(limit);
+  if (!wholeSalers) res.status(404).json(new ApiResponse(404, {}, "Not Found"));
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, wholeSalers, "Whole Salers fetched successfully")
+    );
+});
+
+const getWholeSaleBills = asyncHandler(async (req, res) => {
+  const limit = parseInt(req.query.limit) || 10; // limit
+  const page = parseInt(req.query.page) || 1; // pageNumber
+  const wholeSaleBills = await WholeSaleBillModel.find()
+    .select("totalAmount wholeSalerName paymentStatus payabeledAmount")
+    .sort({ createdAt: -1 })
+    .skip((page - 1) * limit)
+    .limit(limit);
+  if (!wholeSaleBills)
+    res.status(404).json(new ApiResponse(404, {}, "Not Found"));
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        wholeSaleBills,
+        "Whole Sale Bills fetched successfully"
+      )
+    );
+});
+
+const getFabricItem = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  if (!id) throw new ApiError(400, "Id is required to fetch the fabric item");
+  const fabricItem = await FabricModel.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(id),
+      },
+    },
+    {
+      $lookup: {
+        from: "wholeSaler",
+        localField: "purchasedFrom",
+        foreignField: "_id",
+        as: "wholeSalerDetails",
+        pipeline: [
+          {
+            $project: {
+              _id: 1,
+              name: 1,
+              email: 1,
+              phone: 1,
+              address: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $addFields: {
+        wholeSalerDetails: {
+          $arrayElemAt: ["$wholeSalerDetails", 0],
+        },
+      },
+    },
+    {
+      $project: {
+        purchasedFrom: 0,
+        updatedAt: 0,
+        __v: 0,
+      },
+    },
+  ]);
+  if (!fabricItem[0]) throw new ApiError(404, "Fabric Item not found");
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, fabricItem[0], "Fabric Item fetched successfully")
+    );
+});
+
+const getWholeSaler = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  if (!id) throw new ApiError(400, "Id is required to fetch the whole saler");
+  const wholeSaler = await WholeSalerModel.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(id),
+      },
+    },
+    {
+      $lookup: {
+        from: "wholeSaleBill",
+        localField: "wholeSaleBill",
+        foreignField: "_id",
+        as: "wholeSaleBillDetails",
+        pipeline: [
+          {
+            $project: {
+              totalAmount: 1,
+              paymentStatus: 1,
+              payabeledAmount: 1,
+              createdAt: 1,
+            },
+          },
+        ],
+      },
+    },
+  ]);
+  if (!wholeSaler[0]) throw new ApiError(404, "Whole Saler not found");
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, wholeSaler[0], "Whole Saler fetched successfully")
+    );
+});
+
+const getWholeSaleBill = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  if (!id)
+    throw new ApiError(400, "Id is required to fetch the whole sale bill");
+  const wholeSaleBill = await WholeSaleBillModel.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(id),
+      },
+    },
+    {
+      $lookup: {
+        from: "wholeSaler",
+        localField: "wholeSaler",
+        foreignField: "_id",
+        as: "wholeSalerDetails",
+        pipeline: [
+          {
+            $project: {
+              _id: 1,
+              name: 1,
+              email: 1,
+              phone: 1,
+              address: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $addFields: {
+        wholeSalerDetails: {
+          $arrayElemAt: ["$wholeSalerDetails", 0],
+        },
+      },
+    },
+    {
+      $project: {
+        wholeSaler: 0,
+        updatedAt: 0,
+        __v: 0,
+      },
+    },
+  ]);
+
+  if (!wholeSaleBill[0]) throw new ApiError(404, "Whole Sale Bill not found");
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        wholeSaleBill[0],
+        "Whole Sale Bill fetched successfully"
+      )
+    );
+});
+
 // Delete || DELETE
 const deleteClothingItem = asyncHandler(async (req, res) => {
   const { id } = req.params;
@@ -1894,12 +2375,19 @@ export {
   addStitchBill,
   addWorkForEmployee,
   addAdvanceForEmployee,
+  addFabricItem,
+  addWholeSaler,
+  addWholeSaleBill,
   giveMoneyToEmployee,
   removeAdvanceFromEmployee,
   updateEmployee,
+  updateEmployeeProfile,
   updateCustomer,
   updateClothingItem,
   updateMeasurement,
+  updateFabricItem,
+  updateWholeSaler,
+  updateWholeSaleBill,
   changePassword,
   getCustomerProfile,
   getSoldCustomersList,
@@ -1910,6 +2398,12 @@ export {
   getAnalytics,
   getEmployeeProfile,
   getWork,
+  getFabricItems,
+  getWholeSalers,
+  getWholeSaleBills,
+  getFabricItem,
+  getWholeSaler,
+  getWholeSaleBill,
   login,
   logout,
   getClothingItems,

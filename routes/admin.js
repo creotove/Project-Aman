@@ -29,6 +29,8 @@ import {
   deleteClothingItem,
   updateClothingItem,
   removeAdvanceFromEmployee,
+  updateEmployeeProfile,
+  addFabricItem,
 } from "../controllers/adminCtrls.js";
 import { upload } from "../middlewares/multer.js";
 import { addBillNumber } from "../middlewares/billNumber.js";
@@ -76,6 +78,8 @@ router.post("/giveMoneyToEmployee/:id", giveMoneyToEmployee); // -> /api/admin/g
 
 router.post("/removeAdvance/:id", removeAdvanceFromEmployee); // -> /api/admin/removeAdvance/:id
 
+router.post('/addFabricItem',addFabricItem); // -> /api/admin/addFabricItem
+
 // PATCH || Update
 router.patch(
   "/updateEmployee/:id",
@@ -85,7 +89,7 @@ router.patch(
       maxCount: 1,
     },
   ]),
-  updateEmployee
+  updateEmployeeProfile
 ); // -> /api/admin/updateEmployee/:id
 
 router.patch(
