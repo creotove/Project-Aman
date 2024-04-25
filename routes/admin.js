@@ -4,37 +4,53 @@ import {
   addEmployee,
   addClothingItem,
   addMeasurement,
+  checkMeasurements,
   addSoldBill,
   addStitchBill,
+  addWorkForEmployee,
+  addAdvanceForEmployee,
+  addFabricItem,
+  addWholeSaler,
+  addWholeSaleBill,
+  giveMoneyToEmployee,
+  removeAdvanceFromEmployee,
   updateEmployee,
+  updateEmployeeProfile,
   updateCustomer,
-  getEmployees,
+  updateClothingItem,
+  updateMeasurement,
+  updateFabricItem,
+  updateWholeSaler,
+  updateWholeSaleBill,
+  changePassword,
   getCustomerProfile,
+  getSoldCustomersList,
+  getStitchCustomersList,
+  searchCustomer,
+  getEmployees,
   getCustomerBills,
   getAnalytics,
   getEmployeeProfile,
+  getWork,
+  getFabricItems,
+  getWholeSalers,
+  getWholeSaleBills,
+  getFabricItem,
+  getWholeSaler,
+  getWholeSaleBill,
   login,
   logout,
-  changePassword,
-  addWorkForEmployee,
-  addAdvanceForEmployee,
-  checkMeasurements,
-  getClothingItemMeasurementNames,
   getClothingItems,
-  getSoldCustomersList,
-  getStitchCustomersList,
-  getWork,
-  giveMoneyToEmployee,
-  searchCustomer,
+  getClothingItemMeasurementNames,
   deleteClothingItem,
-  updateClothingItem,
-  removeAdvanceFromEmployee,
-  updateEmployeeProfile,
-  addFabricItem,
+  getWholeSalerIdName,
+  sendOTP,
+  validateOTP,
 } from "../controllers/adminCtrls.js";
 import { upload } from "../middlewares/multer.js";
 import { addBillNumber } from "../middlewares/billNumber.js";
 import { auth } from "../middlewares/auth.js";
+import { getAuthUser } from "../controllers/auth.js";
 const router = express.Router();
 
 // POST || Creation
@@ -78,7 +94,16 @@ router.post("/giveMoneyToEmployee/:id", giveMoneyToEmployee); // -> /api/admin/g
 
 router.post("/removeAdvance/:id", removeAdvanceFromEmployee); // -> /api/admin/removeAdvance/:id
 
-router.post('/addFabricItem',addFabricItem); // -> /api/admin/addFabricItem
+router.post('/addFabricItem',upload.fields([
+  {
+    name: "image",
+    maxCount: 1,
+  },
+]),addFabricItem); // -> /api/admin/addFabricItem
+
+router.post('/addWholeSaler',addWholeSaler); // -> /api/admin/addWholeSaler
+
+router.post('/addWholeSaleBill',addWholeSaleBill); // -> /api/admin/addWholeSaleBill
 
 // PATCH || Update
 router.patch(
@@ -121,6 +146,13 @@ router.get(
   "/clothingItemMeasurementNames/:name",
   getClothingItemMeasurementNames
 ); // -> /api/admin/clothingItemMeasurementNames/:name
+router.get("/fabricItems", getFabricItems); // -> /api/admin/fabricItems
+router.get("/fabricItem/:id", getFabricItem); // -> /api/admin/fabricItem/:id
+router.get("/wholeSalers", getWholeSalers); // -> /api/admin/wholeSalers
+router.get("/wholeSaler/:id", getWholeSaler); // -> /api/admin/wholeSaler/:id
+router.get("/wholeSaleBills", getWholeSaleBills); // -> /api/admin/wholeSaleBills
+router.get("/wholeSaleBill/:id", getWholeSaleBill); // -> /api/admin/wholeSaleBill/:id
+router.get("/wholeSalerIdName", getWholeSalerIdName); // -> /api/admin/wholeSalerIdName
 
 // DELETE || Delete
 router.delete("/deleteClothingItem/:id", deleteClothingItem); // -> /api/admin/deleteClothingItem/:id
@@ -128,4 +160,7 @@ router.delete("/deleteClothingItem/:id", deleteClothingItem); // -> /api/admin/d
 // Authentication
 router.post("/login", login); // -> /api/admin/login
 router.post("/logout", auth, logout); // -> /api/admin/logout
+router.post('/getAuthenticateUser',auth,getAuthUser) // -> /api/admin/getAuthenticateUser
+router.post('/sendOTP',sendOTP) // -> /api/admin/sendOTP
+router.post('/validateOTP',validateOTP) // -> /api/admin/sendOTP
 export default router;

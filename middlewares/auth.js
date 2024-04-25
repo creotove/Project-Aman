@@ -4,8 +4,8 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import jwt from "jsonwebtoken";
 
 export const auth = asyncHandler(async (req, _, next) => {
-  const token = await req.header("Authorization")?.replace("Bearer ", "");
-  console.log(token);
+  const token = await req.headers.authorization?.replace("Bearer ", "");
+  // console.log(req.headers.authorization);
 
   if (!token) {
     throw new ApiError(401, "Token not found in request header");

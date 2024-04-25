@@ -39,6 +39,9 @@ const userSchema = new mongoose.Schema({
   verifyTokenExpiry: {
     type: Date,
   },
+  passwordResetOTP: {
+    type: Number,
+  },
 });
 
 const UserModel = mongoose.model("user", userSchema);

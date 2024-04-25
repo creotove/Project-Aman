@@ -25,6 +25,7 @@ import MoneyDistributionModel from "../models/MoneyDistributionModel.js";
 import FabricModel from "../models/FabricModel.js";
 import WholeSalerModel from "../models/WholeSaler.js";
 import WholeSaleBillModel from "../models/WholeSaleBillModel.js";
+import { generateOTP, sendOTPEmail } from "../utils/passwordResetMail.js";
 
 // Utility function for pagination
 function paginatedData(Model) {
@@ -187,7 +188,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 // Add || POST
 const addAdmin = asyncHandler(async (req, res) => {
   // Step 1
-  const { name, phoneNumber } = req.body;
+  const { name, phoneNumber, password } = req.body;
 
   // Step 2
   if (name.trim() === "") {
@@ -205,7 +206,7 @@ const addAdmin = asyncHandler(async (req, res) => {
   }
   // Step 4
   const salt = await bcryptjs.genSalt(10);
-  const hashedPassword = await bcryptjs.hash(phoneNumber, salt);
+  const hashedPassword = await bcryptjs.hash(password, salt);
 
   // Step 5
   const localpath = req.files?.avatar[0]?.path;
@@ -983,6 +984,8 @@ const addFabricItem = asyncHandler(async (req, res) => {
   }
 
   const localpath = req.files?.image[0]?.path;
+  console.log("Localpath:", localpath);
+  console.log("req.files:", req.body);
   if (!localpath) throw new ApiError(400, "Fabric image is required");
   const image = await uploadOnCloudinary(localpath);
   if (!image) throw new ApiError(400, "Failed to uplaod image on cloudinary");
@@ -2112,7 +2115,7 @@ const getFabricItems = asyncHandler(async (req, res) => {
   const page = parseInt(req.query.page) || 1; // pageNumber
   const fabricItems = await FabricModel.find()
     .select(
-      "name wholeSalerName purchasedFrom pricePerMeter sellingPerMtrPrice createdAt image"
+      "name wholeSalerName purchasedFrom pricePerMeter sellingPerMtrPrice createdAt image totalMtrsRemaining"
     )
     .sort({ createdAt: -1 })
     .skip((page - 1) * limit)
@@ -2129,7 +2132,7 @@ const getWholeSalers = asyncHandler(async (req, res) => {
   const limit = parseInt(req.query.limit) || 10; // limit
   const page = parseInt(req.query.page) || 1; // pageNumber
   const wholeSalers = await WholeSalerModel.find()
-    .select("name email phone")
+    .select("name email phone address")
     .sort({ createdAt: -1 })
     .skip((page - 1) * limit)
     .limit(limit);
@@ -2308,6 +2311,15 @@ const getWholeSaleBill = asyncHandler(async (req, res) => {
       )
     );
 });
+const getWholeSalerIdName = asyncHandler(async (req, res) => {
+  const wholeSalers = await WholeSalerModel.find().select("name");
+  if (!wholeSalers) throw new ApiError(404, "Whole Salers not found");
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, wholeSalers, "Whole Salers fetched successfully")
+    );
+});
 
 // Delete || DELETE
 const deleteClothingItem = asyncHandler(async (req, res) => {
@@ -2329,7 +2341,7 @@ const login = asyncHandler(async (req, res) => {
   if (!phoneNumber) throw new ApiError(400, "Phone number is required");
   if (!password) throw new ApiError(400, "Password is required");
 
-  const user = await UserModel.findOne({ phoneNumber });
+  const user = await UserModel.findOne({ phoneNumber, role: "ADMIN" });
   if (!user) throw new ApiError(404, "User not found");
 
   const isMatch = await bcryptjs.compare(password, user.password);
@@ -2363,6 +2375,36 @@ const logout = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, {}, "Logged out successfully"));
+});
+
+const sendOTP = asyncHandler(async (req, res) => {
+  const otp = generateOTP();
+  const sent = await sendOTPEmail(process.env.EMAIL, otp);
+  const admin = await UserModel.findOne({ role: "ADMIN" });
+  if (!admin) throw new ApiError(404, "Admin not found");
+  admin.passwordResetOTP = otp;
+  await admin.save();
+  if (!sent)
+    return res
+      .status(200)
+      .json(new ApiResponse(200, { otp }, "OTP sent successfully"));
+  else
+    return res.status(400).json(new ApiResponse(400, {}, "OTP sending failed"));
+});
+
+const validateOTP = asyncHandler(async (req, res) => {
+  const { password, otp } = req.body;
+  const admin = await UserModel.findOne({ role: "ADMIN" });
+  if (admin.passwordResetOTP !== parseInt(otp))
+    throw new ApiError(400, "Invalid OTP");
+  const salt = await bcryptjs.genSalt(10);
+  const hashedPassword = await bcryptjs.hash(password, salt);
+  admin.password = hashedPassword;
+  admin.passwordResetOTP = null;
+  await admin.save();
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Password changed successfully"));
 });
 
 export {
@@ -2401,6 +2443,7 @@ export {
   getFabricItems,
   getWholeSalers,
   getWholeSaleBills,
+  getWholeSalerIdName,
   getFabricItem,
   getWholeSaler,
   getWholeSaleBill,
@@ -2409,4 +2452,6 @@ export {
   getClothingItems,
   getClothingItemMeasurementNames,
   deleteClothingItem,
+  sendOTP,
+  validateOTP,
 };
