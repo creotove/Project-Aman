@@ -22,6 +22,7 @@ import {
   updateFabricItem,
   updateWholeSaler,
   updateWholeSaleBill,
+  updateSoldBill,
   changePassword,
   getCustomerProfile,
   getSoldCustomersList,
@@ -43,6 +44,7 @@ import {
   getClothingItems,
   getClothingItemMeasurementNames,
   deleteClothingItem,
+  deleteSoldBill,
   getWholeSalerIdName,
   sendOTP,
   validateOTP,
@@ -94,16 +96,20 @@ router.post("/giveMoneyToEmployee/:id", giveMoneyToEmployee); // -> /api/admin/g
 
 router.post("/removeAdvance/:id", removeAdvanceFromEmployee); // -> /api/admin/removeAdvance/:id
 
-router.post('/addFabricItem',upload.fields([
-  {
-    name: "image",
-    maxCount: 1,
-  },
-]),addFabricItem); // -> /api/admin/addFabricItem
+router.post(
+  "/addFabricItem",
+  upload.fields([
+    {
+      name: "image",
+      maxCount: 1,
+    },
+  ]),
+  addFabricItem
+); // -> /api/admin/addFabricItem
 
-router.post('/addWholeSaler',addWholeSaler); // -> /api/admin/addWholeSaler
+router.post("/addWholeSaler", addWholeSaler); // -> /api/admin/addWholeSaler
 
-router.post('/addWholeSaleBill',addWholeSaleBill); // -> /api/admin/addWholeSaleBill
+router.post("/addWholeSaleBill", addWholeSaleBill); // -> /api/admin/addWholeSaleBill
 
 // PATCH || Update
 router.patch(
@@ -130,6 +136,7 @@ router.patch(
 
 router.patch("/changePassword", auth, changePassword); // -> /api/admin/changePassword
 router.patch("/clothingItem/:id", updateClothingItem); // -> /api/admin/clothingItem/:id
+router.patch("/soldBill/:id", updateSoldBill); // -> /api/admin/soldBill/:id
 
 // GET || Read
 router.get("/customer", searchCustomer); // -> /api/admin/customer?name=abc&phoneNumber=123
@@ -156,11 +163,12 @@ router.get("/wholeSalerIdName", getWholeSalerIdName); // -> /api/admin/wholeSale
 
 // DELETE || Delete
 router.delete("/deleteClothingItem/:id", deleteClothingItem); // -> /api/admin/deleteClothingItem/:id
+router.delete("/soldBill/:id", deleteSoldBill); // -> /api/admin/deleteSoldBill/:id
 
 // Authentication
 router.post("/login", login); // -> /api/admin/login
 router.post("/logout", auth, logout); // -> /api/admin/logout
-router.post('/getAuthenticateUser',auth,getAuthUser) // -> /api/admin/getAuthenticateUser
-router.post('/sendOTP',sendOTP) // -> /api/admin/sendOTP
-router.post('/validateOTP',validateOTP) // -> /api/admin/sendOTP
+router.post("/getAuthenticateUser", auth, getAuthUser); // -> /api/admin/getAuthenticateUser
+router.post("/sendOTP", sendOTP); // -> /api/admin/sendOTP
+router.post("/validateOTP", validateOTP); // -> /api/admin/sendOTP
 export default router;

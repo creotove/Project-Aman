@@ -16,16 +16,21 @@ import MeasurementModel from "../models/MeasurementModel.js";
 import CustomerModel from "../models/CustomerModel.js";
 import SoldBillModel from "../models/SoldBillModel.js";
 import StitchBillModel from "../models/StitchBillModel.js";
-import { analyticsAdd } from "../utils/analyticsAdd.js";
 import mongoose from "mongoose";
 import AnalyticsModel from "../models/AnalyticsModel.js";
 import WorkModel from "../models/WorkModel.js";
-import { pipeline } from "../constants/index.js";
+import {
+  analyticsHelper,
+  billType,
+  customerType,
+  pipeline,
+} from "../constants/index.js";
 import MoneyDistributionModel from "../models/MoneyDistributionModel.js";
 import FabricModel from "../models/FabricModel.js";
 import WholeSalerModel from "../models/WholeSaler.js";
 import WholeSaleBillModel from "../models/WholeSaleBillModel.js";
 import { generateOTP, sendOTPEmail } from "../utils/passwordResetMail.js";
+import { dateHelperForAnalytics, analyticsAdd } from "../utils/analyticsAdd.js";
 
 // Utility function for pagination
 function paginatedData(Model) {
@@ -760,10 +765,27 @@ const addSoldBill = asyncHandler(async (req, res) => {
   }
 
   // Analytics for Stitch Bill
+  const { day, month } = dateHelperForAnalytics();
   if (!user) {
-    analyticsAdd(totalAmt, "SOLD", "NEW");
+    analyticsAdd(
+      totalAmt,
+      billType.SOLD,
+      customerType.NEW,
+      analyticsHelper.ADD,
+      false,
+      month,
+      day
+    );
   } else {
-    analyticsAdd(totalAmt, "SOLD", "RETURNING");
+    analyticsAdd(
+      totalAmt,
+      billType.SOLD,
+      customerType.OLD,
+      analyticsHelper.ADD,
+      false,
+      month,
+      day
+    );
   }
 
   return res
@@ -1427,6 +1449,32 @@ const updateWholeSaleBill = asyncHandler(async (req, res) => {
         "Whole Sale Bill Updated Successfully"
       )
     );
+});
+
+const updateSoldBill = asyncHandler(async (req, res) => {
+  const { id } = req.params; // sold bill id
+  const { totalAmt } = req.body;
+
+  const soldBill = await SoldBillModel.findById(id);
+  if (!soldBill) throw new ApiError(404, "Sold Bill not found");
+
+  const { day, month } = dateHelperForAnalytics(soldBill.createdAt);
+  const isNegative = totalAmt < soldBill.totalAmt;
+  const amountToBeAdded = Math.abs(totalAmt - soldBill.totalAmt);
+  await analyticsAdd(
+    amountToBeAdded,
+    billType.SOLD,
+    customerType.OLD,
+    analyticsHelper.UPDATE,
+    isNegative,
+    month,
+    day
+  );
+  soldBill.totalAmt = totalAmt;
+  await soldBill.save();
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Sold Bill Updated Successfully"));
 });
 
 // Retrive || GET
@@ -2335,6 +2383,41 @@ const deleteClothingItem = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "Clothing Item deleted successfully"));
 });
 
+const deleteSoldBill = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  if (!id) throw new ApiError(400, "Id is required to delete the sold bill");
+
+  const soldBill = await SoldBillModel.findById(id);
+  if (!soldBill) throw new ApiError(404, "Sold Bill not found");
+
+  const { month, day } = dateHelperForAnalytics(soldBill.createdAt);
+
+  await analyticsAdd(
+    soldBill.totalAmt,
+    billType.SOLD,
+    customerType.OLD,
+    analyticsHelper.DELETE,
+    true,
+    month,
+    day
+  );
+
+  const customerThatBillBelongsTo = await CustomerModel.findOne({
+    purchasedBill: id,
+  });
+
+  if (customerThatBillBelongsTo) {
+    customerThatBillBelongsTo.purchasedBill =
+      customerThatBillBelongsTo.purchasedBill.filter(
+        (bill) => bill.toString() !== id
+      );
+    await customerThatBillBelongsTo.save();
+  }
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Sold Bill deleted successfully"));
+});
+
 // Auth || POST
 const login = asyncHandler(async (req, res) => {
   const { phoneNumber, password } = req.body;
@@ -2430,6 +2513,7 @@ export {
   updateFabricItem,
   updateWholeSaler,
   updateWholeSaleBill,
+  updateSoldBill,
   changePassword,
   getCustomerProfile,
   getSoldCustomersList,
@@ -2452,6 +2536,7 @@ export {
   getClothingItems,
   getClothingItemMeasurementNames,
   deleteClothingItem,
+  deleteSoldBill,
   sendOTP,
   validateOTP,
 };
