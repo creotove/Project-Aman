@@ -23,6 +23,7 @@ import {
   updateWholeSaler,
   updateWholeSaleBill,
   updateSoldBill,
+  updateStitchedBill,
   changePassword,
   getCustomerProfile,
   getSoldCustomersList,
@@ -48,6 +49,7 @@ import {
   getWholeSalerIdName,
   sendOTP,
   validateOTP,
+  deleteStitchBill,
 } from "../controllers/adminCtrls.js";
 import { upload } from "../middlewares/multer.js";
 import { addBillNumber } from "../middlewares/billNumber.js";
@@ -140,6 +142,7 @@ router.patch(
 router.patch("/changePassword", auth, changePassword); // -> /api/v1/admin/changePassword
 router.patch("/clothingItem/:id", updateClothingItem); // -> /api/v1/admin/clothingItem/:id
 router.patch("/soldBill/:id", updateSoldBill); // -> /api/v1/admin/soldBill/:id
+router.patch("/stitchBill/:id", updateStitchedBill); // -> /api/v1/admin/stitchBill/:id
 
 // GET || Read
 router.get("/customer", searchCustomer); // -> /api/v1/admin/customer?name=abc&phoneNumber=123
@@ -167,6 +170,7 @@ router.get("/wholeSalerIdName", getWholeSalerIdName); // -> /api/v1/admin/wholeS
 // DELETE || Delete
 router.delete("/clothingItem/:id", deleteClothingItem); // -> /api/v1/admin/clothingItem/:id
 router.delete("/soldBill/:id", deleteSoldBill); // -> /api/v1/admin/deleteSoldBill/:id
+router.delete("/stitchBill/:id", deleteStitchBill); // -> /api/v1/admin/deleteSoldBill/:id
 
 // Authentication
 router.post("/login", login); // -> /api/v1/admin/login

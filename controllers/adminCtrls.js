@@ -873,11 +873,30 @@ const addStitchBill = asyncHandler(async (req, res) => {
     await customer.save();
   }
 
+  // Day and Month for Analytics
+  const { day, month } = dateHelperForAnalytics();
+
   // Analytics for Stitch Bill
   if (!user) {
-    analyticsAdd(finalAmt, "STITCH", "NEW");
+    await analyticsAdd(
+      finalAmt,
+      billType.STITCHED,
+      customerType.NEW,
+      analyticsHelper.ADD,
+      false,
+      month,
+      day
+    );
   } else {
-    analyticsAdd(finalAmt, "STITCH", "RETURNING");
+    await analyticsAdd(
+      finalAmt,
+      billType.STITCHED,
+      customerType.OLD,
+      analyticsHelper.ADD,
+      false,
+      month,
+      day
+    );
   }
 
   return res
@@ -1453,6 +1472,7 @@ const updateWholeSaleBill = asyncHandler(async (req, res) => {
 
 const updateSoldBill = asyncHandler(async (req, res) => {
   const { id } = req.params; // sold bill id
+  if (id === undefined) throw new ApiError(400, "Id is required");
   const { totalAmt } = req.body;
 
   const soldBill = await SoldBillModel.findById(id);
@@ -1475,6 +1495,37 @@ const updateSoldBill = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, {}, "Sold Bill Updated Successfully"));
+});
+
+const updateStitchedBill = asyncHandler(async (req, res) => {
+  const { id } = req.params; // stitched bill id
+  if (id === undefined) throw new ApiError(400, "Id is required");
+  const { totalAmt, clothes, deliveryDate, finalAmt, advanceAmt } = req.body;
+
+  const stitchedBill = await StitchBillModel.findById(id);
+  if (!stitchedBill) throw new ApiError(404, "Stitched Bill not found");
+
+  const { day, month } = dateHelperForAnalytics(stitchedBill.createdAt);
+  const isNegative = finalAmt < stitchedBill.finalAmt;
+  const amountToBeAdded = Math.abs(finalAmt - stitchedBill.finalAmt);
+  await analyticsAdd(
+    amountToBeAdded,
+    billType.STITCHED,
+    customerType.OLD,
+    analyticsHelper.UPDATE,
+    isNegative,
+    month,
+    day
+  );
+  if (clothes) stitchedBill.clothes = clothes;
+  if (deliveryDate) stitchedBill.deliveryDate = deliveryDate;
+  if (finalAmt) stitchedBill.finalAmt = finalAmt;
+  if (advanceAmt) stitchedBill.advanceAmt = advanceAmt;
+  if (totalAmt) stitchedBill.totalAmt = totalAmt;
+  await stitchedBill.save();
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Stitched Bill Updated Successfully"));
 });
 
 // Retrive || GET
@@ -2413,11 +2464,51 @@ const deleteSoldBill = asyncHandler(async (req, res) => {
       );
     await customerThatBillBelongsTo.save();
   }
+
+  const deletedBill = await SoldBillModel.findByIdAndDelete(id);
+  if (!deletedBill) throw new ApiError(404, "Error deleting the sold bill");
   return res
     .status(200)
     .json(new ApiResponse(200, {}, "Sold Bill deleted successfully"));
 });
 
+const deleteStitchBill = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  if (!id) throw new ApiError(400, "Id is required to delete the stitch bill");
+
+  const stitchBill = await StitchBillModel.findById(id);
+  if (!stitchBill) throw new ApiError(404, "Stitch Bill not found");
+
+  const { month, day } = dateHelperForAnalytics(stitchBill.createdAt);
+
+  await analyticsAdd(
+    stitchBill.finalAmt,
+    billType.STITCHED,
+    customerType.OLD,
+    analyticsHelper.DELETE,
+    true,
+    month,
+    day
+  );
+
+  const customerThatBillBelongsTo = await CustomerModel.findOne({
+    stitchedBill: id,
+  });
+
+  if (customerThatBillBelongsTo) {
+    customerThatBillBelongsTo.stitchedBill =
+      customerThatBillBelongsTo.stitchedBill.filter(
+        (bill) => bill.toString() !== id
+      );
+    await customerThatBillBelongsTo.save();
+  }
+
+  const deletedBill = await StitchBillModel.findByIdAndDelete(id);
+  if (!deletedBill) throw new ApiError(404, "Error deleting the stitch bill");
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Stitch Bill deleted successfully"));
+});
 // Auth || POST
 const login = asyncHandler(async (req, res) => {
   const { phoneNumber, password } = req.body;
@@ -2514,6 +2605,7 @@ export {
   updateWholeSaler,
   updateWholeSaleBill,
   updateSoldBill,
+  updateStitchedBill,
   changePassword,
   getCustomerProfile,
   getSoldCustomersList,
@@ -2537,6 +2629,7 @@ export {
   getClothingItemMeasurementNames,
   deleteClothingItem,
   deleteSoldBill,
+  deleteStitchBill,
   sendOTP,
   validateOTP,
 };

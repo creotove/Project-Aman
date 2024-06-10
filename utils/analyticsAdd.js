@@ -30,10 +30,10 @@ export const analyticsAdd = async (
             profit: amountToUpdate,
             customers: paramsCustomerType === customerType.NEW ? 1 : 0,
             newCustomers: paramsCustomerType === customerType.NEW ? 1 : 0,
-            sales: paramsBillType === billType.stitch ? 0 : amountToUpdate,
-            salesBillCount: paramsBillType === billType.stitch ? 0 : 1,
-            stitch: paramsBillType === billType.stitch ? amountToUpdate : 0,
-            stitchBillCount: paramsBillType === billType.stitch ? 1 : 0,
+            sales: paramsBillType === billType.STITCHED ? 0 : amountToUpdate,
+            salesBillCount: paramsBillType === billType.STITCHED ? 0 : 1,
+            stitch: paramsBillType === billType.STITCHED ? amountToUpdate : 0,
+            stitchBillCount: paramsBillType === billType.STITCHED ? 1 : 0,
             monthlyData: [
               {
                 month: paramsMonth.slice(0, 3),
@@ -42,10 +42,12 @@ export const analyticsAdd = async (
                 profit: amountToUpdate,
                 customers: paramsCustomerType === customerType.NEW ? 1 : 0,
                 newCustomers: paramsCustomerType === customerType.NEW ? 1 : 0,
-                sales: paramsBillType === billType.stitch ? 0 : amountToUpdate,
-                salesBillCount: paramsBillType === billType.stitch ? 0 : 1,
-                stitch: paramsBillType === billType.stitch ? amountToUpdate : 0,
-                stitchBillCount: paramsBillType === billType.stitch ? 1 : 0,
+                sales:
+                  paramsBillType === billType.STITCHED ? 0 : amountToUpdate,
+                salesBillCount: paramsBillType === billType.STITCHED ? 0 : 1,
+                stitch:
+                  paramsBillType === billType.STITCHED ? amountToUpdate : 0,
+                stitchBillCount: paramsBillType === billType.STITCHED ? 1 : 0,
               },
             ],
             dailyData: [
@@ -56,10 +58,12 @@ export const analyticsAdd = async (
                 profit: amountToUpdate,
                 customers: paramsCustomerType === customerType.NEW ? 1 : 0,
                 newCustomers: paramsCustomerType === customerType.NEW ? 1 : 0,
-                sales: paramsBillType === billType.stitch ? 0 : amountToUpdate,
-                salesBillCount: paramsBillType === billType.stitch ? 0 : 1,
-                stitch: paramsBillType === billType.stitch ? amountToUpdate : 0,
-                stitchBillCount: paramsBillType === billType.stitch ? 1 : 0,
+                sales:
+                  paramsBillType === billType.STITCHED ? 0 : amountToUpdate,
+                salesBillCount: paramsBillType === billType.STITCHED ? 0 : 1,
+                stitch:
+                  paramsBillType === billType.STITCHED ? amountToUpdate : 0,
+                stitchBillCount: paramsBillType === billType.STITCHED ? 1 : 0,
               },
             ],
           });
@@ -205,10 +209,10 @@ export const analyticsAdd = async (
                     ? -1
                     : 1
                   : 0,
-              sales: paramsBillType === billType.stitch ? 0 : amountToUpdate,
-              salesBillCount: paramsBillType === billType.stitch ? 0 : 1,
-              stitch: paramsBillType === billType.stitch ? amountToUpdate : 0,
-              stitchBillCount: paramsBillType === billType.stitch ? 1 : 0,
+              sales: paramsBillType === billType.STITCHED ? 0 : amountToUpdate,
+              salesBillCount: paramsBillType === billType.STITCHED ? 0 : 1,
+              stitch: paramsBillType === billType.STITCHED ? amountToUpdate : 0,
+              stitchBillCount: paramsBillType === billType.STITCHED ? 1 : 0,
             });
           }
 
