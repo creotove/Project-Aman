@@ -20,9 +20,9 @@ export const pipeline = [
   },
 ];
 export const analyticsHelper = Object.freeze({
-  UPDATE: "update",
-  ADD: "add",
-  DELETE: "delete",
+  UPDATE: "UPDATE",
+  ADD: "ADD",
+  DELETE: "DELETE",
 });
 
 export const customerType = Object.freeze({

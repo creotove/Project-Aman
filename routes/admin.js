@@ -57,7 +57,7 @@ const router = express.Router();
 
 // POST || Creation
 router.post(
-  "/addAdmin",
+  "/admin",
   upload.fields([
     {
       name: "avatar",
@@ -65,10 +65,10 @@ router.post(
     },
   ]),
   addAdmin
-); // -> /api/admin/addAdmin
+); // -> /api/v1/admin/addAdmin
 
 router.post(
-  "/addEmployee",
+  "/employee",
   upload.fields([
     {
       name: "avatar",
@@ -76,28 +76,31 @@ router.post(
     },
   ]),
   addEmployee
-); // -> /api/admin/addEmployee
+); // -> /api/v1/admin/addEmployee
 
-router.post("/addClothingItem", addClothingItem); // -> /api/admin/addClothingItem
+router.post("/clothingItem", addClothingItem); // -> /api/v1/admin/clothingItem
 
-router.post("/addMeasurement/:id", addMeasurement); // -> /api/admin/addMeasurement
+router.post("/measurement/:id", addMeasurement); // -> /api/v1/admin/measurement
 
-router.post("/addStitchBill", addBillNumber, addStitchBill); // -> /api/admin/addStitchBill
+router.post("/stitchBill", addBillNumber, addStitchBill); // -> /api/v1/admin/stitchBill
 
-router.post("/addSoldBill", addBillNumber, addSoldBill); // -> /api/admin/addSoldBill
+router.post("/soldBill", addBillNumber, addSoldBill); // -> /api/v1/admin/soldBill
 
-router.post("/addWork/:id", addWorkForEmployee); // -> /api/admin/addWork
+router.post("/work/:id", addWorkForEmployee); // -> /api/v1/admin/work
 
-router.post("/addAdvance/:id", addAdvanceForEmployee); // -> /api/admin/addWork
+router.post("/advanceToEmployee/:id", addAdvanceForEmployee); // -> /api/v1/admin/advanceToEmployee
 
-router.post("/checkMeasurements", checkMeasurements); // -> /api/admin/checkMeasurements
+router.post("/checkMeasurements", checkMeasurements); // -> /api/v1/admin/checkMeasurements
 
-router.post("/giveMoneyToEmployee/:id", giveMoneyToEmployee); // -> /api/admin/giveMoneyToEmployee/:id
-
-router.post("/removeAdvance/:id", removeAdvanceFromEmployee); // -> /api/admin/removeAdvance/:id
+router.post("/moneyToEmployee/:id", giveMoneyToEmployee); // -> /api/v1/admin/moneyToEmployee/:id
 
 router.post(
-  "/addFabricItem",
+  "/takeMoneyThatWasGivenAdvanceToEmployee/:id",
+  removeAdvanceFromEmployee
+); // -> /api/v1/admin/takeMoneyThatWasGivenAdvanceToEmployee/:id
+
+router.post(
+  "/fabricItem",
   upload.fields([
     {
       name: "image",
@@ -105,15 +108,15 @@ router.post(
     },
   ]),
   addFabricItem
-); // -> /api/admin/addFabricItem
+); // -> /api/v1/admin/fabricItem
 
-router.post("/addWholeSaler", addWholeSaler); // -> /api/admin/addWholeSaler
+router.post("/wholeSaler", addWholeSaler); // -> /api/v1/admin/wholeSaler
 
-router.post("/addWholeSaleBill", addWholeSaleBill); // -> /api/admin/addWholeSaleBill
+router.post("/wholeSaleBill", addWholeSaleBill); // -> /api/v1/admin/wholeSaleBill
 
 // PATCH || Update
 router.patch(
-  "/updateEmployee/:id",
+  "/employee/:id",
   upload.fields([
     {
       name: "avatar",
@@ -121,10 +124,10 @@ router.patch(
     },
   ]),
   updateEmployeeProfile
-); // -> /api/admin/updateEmployee/:id
+); // -> /api/v1/admin/employee/:id
 
 router.patch(
-  "/updateCustomer/:id",
+  "/customer/:id",
   upload.fields([
     {
       name: "avatar",
@@ -132,43 +135,43 @@ router.patch(
     },
   ]),
   updateCustomer
-); // -> /api/admin/updateCustomer/:id
+); // -> /api/v1/admin/customer/:id
 
-router.patch("/changePassword", auth, changePassword); // -> /api/admin/changePassword
-router.patch("/clothingItem/:id", updateClothingItem); // -> /api/admin/clothingItem/:id
-router.patch("/soldBill/:id", updateSoldBill); // -> /api/admin/soldBill/:id
+router.patch("/changePassword", auth, changePassword); // -> /api/v1/admin/changePassword
+router.patch("/clothingItem/:id", updateClothingItem); // -> /api/v1/admin/clothingItem/:id
+router.patch("/soldBill/:id", updateSoldBill); // -> /api/v1/admin/soldBill/:id
 
 // GET || Read
-router.get("/customer", searchCustomer); // -> /api/admin/customer?name=abc&phoneNumber=123
-router.get("/stitchCustomerList", getStitchCustomersList); // -> /api/admin/customers
-router.get("/soldCustomerList", getSoldCustomersList); // -> /api/admin/customers
-router.get("/customer/:id", getCustomerProfile); // -> /api/admin/customer/:id
-router.get("/bills/:id", getCustomerBills); // -> /api/admin/bills/:id
-router.get("/employees", getEmployees); // -> /api/admin/employees
-router.get("/employee/:id", getEmployeeProfile); // -> /api/admin/employees/:id
-router.get("/work/:id", getWork); // -> /api/admin/employees/:id
-router.get("/analytics", getAnalytics); // -> /api/admin/analytics
-router.get("/clothingItems", getClothingItems); // -> /api/admin/clothingItem/:id
+router.get("/customer", searchCustomer); // -> /api/v1/admin/customer?name=abc&phoneNumber=123
+router.get("/stitchCustomerList", getStitchCustomersList); // -> /api/v1/admin/stitchCustomerList
+router.get("/soldCustomerList", getSoldCustomersList); // -> /api/v1/admin/soldCustomerList
+router.get("/customer/:id", getCustomerProfile); // -> /api/v1/admin/customer/:id
+router.get("/bills/:id", getCustomerBills); // -> /api/v1/admin/bills/:id
+router.get("/employees", getEmployees); // -> /api/v1/admin/employees
+router.get("/employee/:id", getEmployeeProfile); // -> /api/v1/admin/employees/:id
+router.get("/work/:id", getWork); // -> /api/v1/admin/employees/:id
+router.get("/analytics", getAnalytics); // -> /api/v1/admin/analytics
+router.get("/clothingItems", getClothingItems); // -> /api/v1/admin/clothingItems
 router.get(
   "/clothingItemMeasurementNames/:name",
   getClothingItemMeasurementNames
-); // -> /api/admin/clothingItemMeasurementNames/:name
-router.get("/fabricItems", getFabricItems); // -> /api/admin/fabricItems
-router.get("/fabricItem/:id", getFabricItem); // -> /api/admin/fabricItem/:id
-router.get("/wholeSalers", getWholeSalers); // -> /api/admin/wholeSalers
-router.get("/wholeSaler/:id", getWholeSaler); // -> /api/admin/wholeSaler/:id
-router.get("/wholeSaleBills", getWholeSaleBills); // -> /api/admin/wholeSaleBills
-router.get("/wholeSaleBill/:id", getWholeSaleBill); // -> /api/admin/wholeSaleBill/:id
-router.get("/wholeSalerIdName", getWholeSalerIdName); // -> /api/admin/wholeSalerIdName
+); // -> /api/v1/admin/clothingItemMeasurementNames/:name
+router.get("/fabricItems", getFabricItems); // -> /api/v1/admin/fabricItems
+router.get("/fabricItem/:id", getFabricItem); // -> /api/v1/admin/fabricItem/:id
+router.get("/wholeSalers", getWholeSalers); // -> /api/v1/admin/wholeSalers
+router.get("/wholeSaler/:id", getWholeSaler); // -> /api/v1/admin/wholeSaler/:id
+router.get("/wholeSaleBills", getWholeSaleBills); // -> /api/v1/admin/wholeSaleBills
+router.get("/wholeSaleBill/:id", getWholeSaleBill); // -> /api/v1/admin/wholeSaleBill/:id
+router.get("/wholeSalerIdName", getWholeSalerIdName); // -> /api/v1/admin/wholeSalerIdName
 
 // DELETE || Delete
-router.delete("/deleteClothingItem/:id", deleteClothingItem); // -> /api/admin/deleteClothingItem/:id
-router.delete("/soldBill/:id", deleteSoldBill); // -> /api/admin/deleteSoldBill/:id
+router.delete("/clothingItem/:id", deleteClothingItem); // -> /api/v1/admin/clothingItem/:id
+router.delete("/soldBill/:id", deleteSoldBill); // -> /api/v1/admin/deleteSoldBill/:id
 
 // Authentication
-router.post("/login", login); // -> /api/admin/login
-router.post("/logout", auth, logout); // -> /api/admin/logout
-router.post("/getAuthenticateUser", auth, getAuthUser); // -> /api/admin/getAuthenticateUser
-router.post("/sendOTP", sendOTP); // -> /api/admin/sendOTP
-router.post("/validateOTP", validateOTP); // -> /api/admin/sendOTP
+router.post("/login", login); // -> /api/v1/admin/login
+router.post("/logout", auth, logout); // -> /api/v1/admin/logout
+router.post("/getAuthenticateUser", auth, getAuthUser); // -> /api/v1/admin/getAuthenticateUser
+router.post("/sendOTP", sendOTP); // -> /api/v1/admin/sendOTP
+router.post("/validateOTP", validateOTP); // -> /api/v1/admin/sendOTP
 export default router;
