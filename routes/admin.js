@@ -72,16 +72,7 @@ router.post(
   addAdmin
 ); // -> /api/v1/admin/addAdmin
 
-router.post(
-  "/employee",
-  upload.fields([
-    {
-      name: "avatar",
-      maxCount: 1,
-    },
-  ]),
-  addEmployee
-); // -> /api/v1/admin/addEmployee
+router.post("/employee", upload.single("avatar"), addEmployee); // -> /api/v1/admin/addEmployee
 
 router.post("/clothingItem", addClothingItem); // -> /api/v1/admin/clothingItem
 

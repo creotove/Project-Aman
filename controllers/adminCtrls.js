@@ -286,20 +286,23 @@ const addEmployee = asyncHandler(async (req, res) => {
   const salt = await bcryptjs.genSalt(10);
   const hashedPassword = await bcryptjs.hash(phoneNumber.toString(), salt);
 
-  // Step 5
-  const localpath = req.files?.avatar[0]?.path;
-  if (!localpath) throw new ApiError(400, "Avatar is required");
-  const avatar = await uploadOnCloudinary(localpath);
-  if (!avatar) throw new ApiError(400, "Avatar is required");
-
-  // Step 6
-  unLinkFile(localpath)
-    .then((result) => {
-      console.log("Deletion result:", result);
-    })
-    .catch((error) => {
-      console.error("Deletion error:", error);
-    });
+  let avatar;
+  if (req.file && req.file.fieldname === "avatar") {
+    console.log("Uploading Avatar on Cloudinary");
+    // Step 5
+    const localpath = req.file.path;
+    if (!localpath) throw new ApiError(400, "Avatar is required");
+    avatar = await uploadOnCloudinary(localpath);
+    if (!avatar) throw new ApiError(400, "Avatar is required");
+    // Step 6
+    unLinkFile(localpath)
+      .then((result) => {
+        console.log("Deletion result:", result);
+      })
+      .catch((error) => {
+        console.error("Deletion error:", error);
+      });
+  }
 
   // Step 7
   const newUser = await UserModel.create({

@@ -18,21 +18,37 @@ export function unLinkFile(localpath) {
     }
     const fileNameToBeDeleted = splittedFileName[splittedFileName.length - 1];
     console.log("file name : " + fileNameToBeDeleted);
-    const filePath = path.join(
-      __dirname,
-      `../public/temp/${fileNameToBeDeleted}`
-    );
-    console.log("final file Path : " + filePath);
+    if (process.env.NODE_ENV === "development") {
+      const filePath = path.join(
+        __dirname,
+        `../public/temp/${fileNameToBeDeleted}`
+      );
+      console.log("final file Path : " + filePath);
 
-    fs.unlink(filePath, (err) => {
-      if (err) {
-        console.log("Error occurred while deleting file");
-        console.error(err);
-        reject(err);
-      } else {
-        console.log("File deleted successfully");
-        resolve(true);
-      }
-    });
+      fs.unlink(filePath, (err) => {
+        if (err) {
+          console.log("Error occurred while deleting file");
+          console.error(err);
+          reject(err);
+        } else {
+          console.log("File deleted successfully");
+          resolve(true);
+        }
+      });
+    } else {
+      const filePath = path.join(__dirname, `../tmp/${fileNameToBeDeleted}`);
+      console.log("final file Path : " + filePath);
+
+      fs.unlink(filePath, (err) => {
+        if (err) {
+          console.log("Error occurred while deleting file");
+          console.error(err);
+          reject(err);
+        } else {
+          console.log("File deleted successfully");
+          resolve(true);
+        }
+      });
+    }
   });
 }
