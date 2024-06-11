@@ -24,6 +24,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: "https://www.w3schools.com/howto/img_avatar.png",
   },
+  isActive: {
+    type: Boolean,
+    default: true,
+  },
   refreshToken: {
     type: String,
   },

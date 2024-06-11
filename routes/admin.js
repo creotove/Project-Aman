@@ -28,7 +28,9 @@ import {
   getCustomerProfile,
   getSoldCustomersList,
   getStitchCustomersList,
-  searchCustomer,
+  getAllCustomersList,
+  searchCustomerBasedOnPhoneNumber,
+  searchCustomerBasedOnName,
   getEmployees,
   getCustomerBills,
   getAnalytics,
@@ -50,6 +52,7 @@ import {
   sendOTP,
   validateOTP,
   deleteStitchBill,
+  deleteCustomer,
 } from "../controllers/adminCtrls.js";
 import { upload } from "../middlewares/multer.js";
 import { addBillNumber } from "../middlewares/billNumber.js";
@@ -128,16 +131,7 @@ router.patch(
   updateEmployeeProfile
 ); // -> /api/v1/admin/employee/:id
 
-router.patch(
-  "/customer/:id",
-  upload.fields([
-    {
-      name: "avatar",
-      maxCount: 1,
-    },
-  ]),
-  updateCustomer
-); // -> /api/v1/admin/customer/:id
+router.patch("/customer/:id", upload.single("avatar"), updateCustomer); // -> /api/v1/admin/customer/:id
 
 router.patch("/changePassword", auth, changePassword); // -> /api/v1/admin/changePassword
 router.patch("/clothingItem/:id", updateClothingItem); // -> /api/v1/admin/clothingItem/:id
@@ -145,7 +139,12 @@ router.patch("/soldBill/:id", updateSoldBill); // -> /api/v1/admin/soldBill/:id
 router.patch("/stitchBill/:id", updateStitchedBill); // -> /api/v1/admin/stitchBill/:id
 
 // GET || Read
-router.get("/customer", searchCustomer); // -> /api/v1/admin/customer?name=abc&phoneNumber=123
+router.get(
+  "/searchCustomerBasedOnPhoneNumber/:phoneNumber",
+  searchCustomerBasedOnPhoneNumber
+); // -> /api/v1/admin/searchCustomerBasedOnPhoneNumber/:phoneNumber
+router.get("/searchCustomersBasedOnName/:name", searchCustomerBasedOnName);
+router.get("/customers", getAllCustomersList); // -> /api/v1/admin/customers
 router.get("/stitchCustomerList", getStitchCustomersList); // -> /api/v1/admin/stitchCustomerList
 router.get("/soldCustomerList", getSoldCustomersList); // -> /api/v1/admin/soldCustomerList
 router.get("/customer/:id", getCustomerProfile); // -> /api/v1/admin/customer/:id
@@ -168,6 +167,7 @@ router.get("/wholeSaleBill/:id", getWholeSaleBill); // -> /api/v1/admin/wholeSal
 router.get("/wholeSalerIdName", getWholeSalerIdName); // -> /api/v1/admin/wholeSalerIdName
 
 // DELETE || Delete
+router.delete("/customer/:id", deleteCustomer); // -> /api/v1/admin/deleteCustomer/:id
 router.delete("/clothingItem/:id", deleteClothingItem); // -> /api/v1/admin/clothingItem/:id
 router.delete("/soldBill/:id", deleteSoldBill); // -> /api/v1/admin/deleteSoldBill/:id
 router.delete("/stitchBill/:id", deleteStitchBill); // -> /api/v1/admin/deleteSoldBill/:id
