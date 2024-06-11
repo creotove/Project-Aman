@@ -36,7 +36,7 @@ export function unLinkFile(localpath) {
         }
       });
     } else {
-      const filePath = path.join(__dirname, `../tmp/${fileNameToBeDeleted}`);
+      const filePath = path.join(__dirname, `/tmp/${fileNameToBeDeleted}`);
       console.log("final file Path : " + filePath);
 
       fs.unlink(filePath, (err) => {
