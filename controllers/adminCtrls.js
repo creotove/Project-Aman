@@ -22,6 +22,7 @@ import WorkModel from "../models/WorkModel.js";
 import {
   analyticsHelper,
   billType,
+  cookieOptions,
   customerType,
   pipeline,
 } from "../constants/index.js";
@@ -31,6 +32,7 @@ import WholeSalerModel from "../models/WholeSaler.js";
 import WholeSaleBillModel from "../models/WholeSaleBillModel.js";
 import { generateOTP, sendOTPEmail } from "../utils/passwordResetMail.js";
 import { dateHelperForAnalytics, analyticsAdd } from "../utils/analyticsAdd.js";
+import generateAccessAndRefreshToken from "../utils/generateAccessAndRefreshToke.js";
 
 // Utility function for pagination
 function paginatedData(Model) {
@@ -75,42 +77,7 @@ function paginatedData(Model) {
     }
   };
 }
-// Utility function for Access and Refresh Token
-async function generateAccessAndRefreshToken(userId) {
-  try {
-    const user = await UserModel.findById(userId);
-    if (!user)
-      throw new ApiError(404, "User not found in access and refresh token");
 
-    const accessToken = jwt.sign(
-      {
-        _id: user._id,
-        role: user.role,
-      },
-      process.env.ACCESS_TOKEN_SECRET,
-      {
-        expiresIn: "2d",
-      }
-    );
-
-    const refreshToken = jwt.sign(
-      {
-        _id: user._id,
-        role: user.role,
-      },
-      process.env.REFRESH_TOKEN_SECRET,
-      {
-        expiresIn: "7d",
-      }
-    );
-
-    user.refreshToken = refreshToken;
-    await user.save();
-    return { accessToken, refreshToken };
-  } catch (error) {
-    throw new ApiError(500, "Something went wrong while generating tokens");
-  }
-}
 // Utility function for creatingCustomer
 async function createCustomer(name, phoneNumber) {
   try {
@@ -644,7 +611,7 @@ const checkMeasurements = asyncHandler(async (req, res) => {
   if (!user) {
     const { newCustomer, newUser } = await createCustomer(name, phoneNumber);
     if (!newCustomer && !newUser)
-      throw new ApiError(500, "Something went wrong while creating customer");
+      throw new ApiError(500, "User is already registered");
     for (const clothingItem of clothingItems) {
       measurmentsOccurred.set(clothingItem, false);
       const clothingItemDetails = await ClothingModel.findOne({
@@ -2649,7 +2616,7 @@ const login = asyncHandler(async (req, res) => {
   if (!user) throw new ApiError(404, "User not found");
 
   const isMatch = await bcryptjs.compare(password, user.password);
-  if (!isMatch) throw new ApiError(401, "Invalid credentials");
+  if (!isMatch) throw new ApiError(406, "Invalid credentials");
 
   const { accessToken, refreshToken } = await generateAccessAndRefreshToken(
     user._id
@@ -2659,13 +2626,16 @@ const login = asyncHandler(async (req, res) => {
     "-password -refreshToken -forgotPasswordToken -forgotPasswordTokenExpiry -verifyToken -verifyTokenExpiry -__v"
   );
 
-  return res.status(200).json(
-    new ApiResponse(200, {
-      user: loggedInUser,
-      accessToken,
-      refreshToken,
-    })
-  );
+  loggedInUser.refreshToken = refreshToken;
+  await loggedInUser.save();
+  return res.status(200)
+    .cookie("refreshToken", refreshToken, cookieOptions)
+    .json(
+      new ApiResponse(200, {
+        accessToken,
+        user: loggedInUser,
+      })
+    );
 });
 
 const logout = asyncHandler(async (req, res) => {

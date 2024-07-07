@@ -1,30 +1,32 @@
 import UserModel from "../models/UserModel.js";
 import { ApiError } from "../utils/ApiError.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import jwt from "jsonwebtoken";
 
-export const auth = asyncHandler(async (req, _, next) => {
-  const token = await req.headers.authorization?.replace("Bearer ", "");
-  // console.log(req.headers.authorization);
+export const auth = asyncHandler(async (req, res, next) => {
+  const token =
+    req?.cookies?.refreshToken ||
+    req.headers.authorization?.replace("Bearer ", "");
 
   if (!token) {
     throw new ApiError(401, "Token not found in request header");
   }
 
-  const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+  const decodedToken = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET, (err, decoded) => {
+    if (err) {
+      console.log("Error in token verification:", err);
+      res.status(401).
+        clearCookie("refreshToken").
+        clearCookie("accessToken").
+        json(new ApiResponse(401, null, "Token expired or invalid"));
 
-  if (!decodedToken) {
-    throw new ApiError(401, "Unauthorized to access this route");
-  }
+    } else {
+      return decoded;
+    }
+  });
 
-  const user = await UserModel.findById(decodedToken._id).select(
-    "-password -__v -createdAt -updatedAt -refreshToken"
-  );
-
-  if (!user) {
-    throw new ApiError(401, "User not found based on token");
-  }
-
-  req.user = user;
+  console.log("Decoded token:", decodedToken._id);
+  req.userId = decodedToken._id;
   next();
 });
