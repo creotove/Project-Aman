@@ -2153,7 +2153,9 @@ const getEmployees = asyncHandler(async (req, res) => {
       },
     },
   ]);
-  if (!employees[0]) throw new ApiError(404, "Employees not found");
+  if (employees?.length === 0) {
+    return res.status(200).json(new ApiResponse(200, [], "No Employees found"))
+  }
   res
     .status(200)
     .json(new ApiResponse(200, employees, "Employees fetched successfull"));
@@ -2640,7 +2642,7 @@ const login = asyncHandler(async (req, res) => {
 
 const logout = asyncHandler(async (req, res) => {
   await UserModel.findByIdAndUpdate(
-    req.user._id,
+    req.userId,
     {
       refreshToken: null,
     },
@@ -2648,6 +2650,8 @@ const logout = asyncHandler(async (req, res) => {
   );
   return res
     .status(200)
+    .clearCookie("refreshToken")
+    .clearCookie("accessToken")
     .json(new ApiResponse(200, {}, "Logged out successfully"));
 });
 

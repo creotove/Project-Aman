@@ -13,7 +13,7 @@ export const auth = asyncHandler(async (req, res, next) => {
     throw new ApiError(401, "Token not found in request header");
   }
 
-  const decodedToken = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET, (err, decoded) => {
+  jwt.verify(token, process.env.REFRESH_TOKEN_SECRET, (err, decoded) => {
     if (err) {
       console.log("Error in token verification:", err);
       res.status(401).
@@ -22,11 +22,8 @@ export const auth = asyncHandler(async (req, res, next) => {
         json(new ApiResponse(401, null, "Token expired or invalid"));
 
     } else {
-      return decoded;
+      req.userId = decoded._id;
+      next();
     }
   });
-
-  console.log("Decoded token:", decodedToken._id);
-  req.userId = decodedToken._id;
-  next();
 });
