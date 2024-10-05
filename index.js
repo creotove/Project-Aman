@@ -17,7 +17,11 @@ app.use(
     credentials: true,
   })
 );
-app.use(cookieParser());
+app.use(cookieParser({
+  httpOnly: true,
+  secure: true,
+  sameSite: "none",
+}));
 
 app.use("/api/v1/admin", adminRoutes);
 const html = `
