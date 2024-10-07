@@ -37,6 +37,9 @@ export const billType = Object.freeze({
 
 export const cookieOptions = {
   httpOnly: true,
-  sameSite: 'None', secure: true,
-  maxAge: 24 * 60 * 60 * 1000
+  sameSite: "None",
+  secure: true,
+  maxAge: 24 * 60 * 60 * 1000,
 };
+
+export const defaultGetRouteResponse = `<body bgColor='black' style='color:white;font-size:5rem;display:flex;justify-content:center; align-items:center;' >Api is Running...</body>`;
