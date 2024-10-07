@@ -42,4 +42,4 @@ export const cookieOptions = {
   maxAge: 24 * 60 * 60 * 1000,
 };
 
-export const defaultGetRouteResponse = `<body bgColor='black' style='color:white;font-size:5rem;display:flex;justify-content:center; align-items:center;' >Api is Running...</body>`;
+export const defaultGetRouteResponseHTML = `<body bgColor='black' style='color:white;font-size:5rem;display:flex;justify-content:center; align-items:center;' >Api is Running...</body>`;

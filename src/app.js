@@ -7,7 +7,7 @@ import morgan from "morgan";
 import cors from "cors";
 import connectDB from "./config/db.js";
 import cookieParser from "cookie-parser";
-import {defaultGetRouteResponse} from "./constants/index.js";
+import {defaultGetRouteResponseHTML} from "./constants/index.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 dotenv.config();
@@ -42,7 +42,7 @@ for (const file of adminRouteFiles) {
   app.use("/api/v1/admin", route[routeName]);
 }
 app.get("/", (req, res) => {
-  res.send(defaultGetRouteResponse);
+  res.send(defaultGetRouteResponseHTML);
 });
 
 export default app;
