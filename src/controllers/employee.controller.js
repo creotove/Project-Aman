@@ -35,6 +35,13 @@ export const addEmployee = asyncHandler(async (req, res) => {
     phoneNumber,
   });
   if (existedUser) {
+    unLinkFile(req.file.path)
+      .then((result) => {
+        console.log("Deletion result:", result);
+      })
+      .catch((error) => {
+        console.error("Deletion error:", error);
+      });
     throw new ApiError(409, "User already exists");
   }
 
@@ -50,14 +57,6 @@ export const addEmployee = asyncHandler(async (req, res) => {
     if (!localpath) throw new ApiError(400, "Avatar is required");
     avatar = await uploadOnCloudinary(localpath);
     if (!avatar) throw new ApiError(400, "Avatar is required");
-    // Step 6
-    unLinkFile(localpath)
-      .then((result) => {
-        console.log("Deletion result:", result);
-      })
-      .catch((error) => {
-        console.error("Deletion error:", error);
-      });
   }
 
   // Step 7
@@ -65,7 +64,7 @@ export const addEmployee = asyncHandler(async (req, res) => {
     name,
     password: hashedPassword,
     phoneNumber,
-    avatar: avatar.url,
+    avatar: avatar.url || avatar.secure_url,
     role,
   });
 
