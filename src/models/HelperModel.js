@@ -1,9 +1,9 @@
 import mongoose from "mongoose";
 
 const helperSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: [true, "Name is required"],
+  employee_id: {
+    type: mongoose.SchemaTypes.ObjectId,
+    ref: "employee",
   },
   user_id: {
     type: mongoose.SchemaTypes.ObjectId,
@@ -12,14 +12,6 @@ const helperSchema = new mongoose.Schema({
   monthly: {
     type: Number,
     required: [true, "Monthly income is required"],
-  },
-  aadharnumber: {
-    type: Number,
-    required: [true, "Aadhar number is required"],
-  },
-  advance: {
-    type: Number,
-    default: 0,
   },
 });
 

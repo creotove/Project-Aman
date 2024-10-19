@@ -1,9 +1,9 @@
 import mongoose from "mongoose";
 
 const tailorSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: [true, "Name is required"],
+  employee_id: {
+    type: mongoose.SchemaTypes.ObjectId,
+    ref: "employee",
   },
   user_id: {
     type: mongoose.SchemaTypes.ObjectId,
@@ -16,10 +16,6 @@ const tailorSchema = new mongoose.Schema({
   earned: {
     type: Number,
     default: 0,
-  },
-  aadharnumber: {
-    type: Number,
-    required: [true, "Aadhar number is required"],
   },
   stitchingAmounts: {
     type: Map,

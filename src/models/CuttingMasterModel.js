@@ -1,17 +1,13 @@
 import mongoose from "mongoose";
 
 const cuttingMasterSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: [true, "Name is required"],
-  },
   user_id: {
     type: mongoose.SchemaTypes.ObjectId,
     ref: "user",
   },
-  advance: {
-    type: Number,
-    default: 0,
+  employee_id: {
+    type: mongoose.SchemaTypes.ObjectId,
+    ref: "employee",
   },
   earned: {
     type: Number,
@@ -21,10 +17,6 @@ const cuttingMasterSchema = new mongoose.Schema({
     type: Map,
     of: Number,
     default: {},
-  },
-  aadharnumber: {
-    type: Number,
-    required: [true, "Aadhar number is required"],
   },
   work: [
     {

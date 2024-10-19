@@ -12,6 +12,7 @@ import TailorModel from "../models/TailorModel.js";
 import mongoose from "mongoose";
 import WorkModel from "../models/WorkModel.js";
 import MoneyDistributionModel from "../models/MoneyDistributionModel.js";
+import EmployeeModel from "../models/EmployeeModel.js";
 
 export const addEmployee = asyncHandler(async (req, res) => {
   // Step 1
@@ -66,7 +67,7 @@ export const addEmployee = asyncHandler(async (req, res) => {
     password: hashedPassword,
     phoneNumber,
     avatar: avatar.url,
-    role,
+    role: "Employee",
   });
 
   // Step 8
@@ -74,22 +75,30 @@ export const addEmployee = asyncHandler(async (req, res) => {
 
   // Step 8.1
   if (role === "HELPER") {
-    const newHelper = await HelperModel.create({
+    const employee = await EmployeeModel.create({
       name,
-      phoneNumber,
-      monthly,
       user_id: newUser._id,
+      role,
       aadharnumber,
+    });
+    const newHelper = await HelperModel.create({
+      employee_id: employee._id,
+      user_id: newUser._id,
+      monthly,
     });
     if (!newHelper) throw new ApiError(500, "Something went wrong while creating the user");
     await newHelper.save();
   } else if (role === "CM") {
-    const newCuttingMaster = await CuttingMasterModel.create({
+    const employee = await EmployeeModel.create({
       name,
-      phoneNumber,
+      user_id: newUser._id,
+      role,
+      aadharnumber,
+    });
+    const newCuttingMaster = await CuttingMasterModel.create({
+      employee_id: employee._id,
       user_id: newUser._id,
       cuttingAmounts: new Map(),
-      aadharnumber,
     });
     if (!newCuttingMaster) throw new ApiError(500, "Something went wrong while creating the user");
     const clothingItems = await ClothingModel.find();
@@ -102,12 +111,16 @@ export const addEmployee = asyncHandler(async (req, res) => {
     }
     await newCuttingMaster.save();
   } else if (role === "TAILOR") {
-    const newTailor = await TailorModel.create({
+    const employee = await EmployeeModel.create({
       name,
-      phoneNumber,
+      user_id: newUser._id,
+      role,
+      aadharnumber,
+    });
+    const newTailor = await TailorModel.create({
+      employee_id: employee._id,
       user_id: newUser._id,
       stitchingAmounts: new Map(),
-      aadharnumber,
     });
     if (!newTailor) throw new ApiError(500, "Something went wrong while creating the user");
     const clothingItems = await ClothingModel.find();
@@ -399,31 +412,183 @@ export const updateEmployeeProfile = asyncHandler(async (req, res) => {
 });
 
 export const getEmployees = asyncHandler(async (req, res) => {
-  const employees = await UserModel.aggregate([
+  const page = parseInt(req.query.page) || 1;
+  const perPage = parseInt(req.query.perPage) || 10;
+  const offset = (page - 1) * perPage;
+
+  const { search, role, id } = req.query;
+
+  const today = new Date();
+  today.setDate(today.getDate());
+  today.setHours(0, 0, 0, 0);
+
+  const tommorow = new Date(today);
+  tommorow.setDate(tommorow.getDate() + 1);
+
+  let matchStage = {};
+
+  if (id) {
+    matchStage._id = new mongoose.Types.ObjectId(id);
+  } else {
+    if (search) {
+      matchStage.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { aadharnumber: { $regex: search, $options: 'i' } }
+      ];
+    }
+    if (role) {
+      matchStage.role = role.toUpperCase();
+    }
+  }
+
+  const pipeline = [
+    {
+      $lookup: {
+        from: "users",
+        localField: "user_id",
+        foreignField: "_id",
+        as: "userData"
+      }
+    },
+    { $unwind: "$userData" },
     {
       $match: {
-        role: {
-          $nin: ["CUSTOMER", "ADMIN"],
-        },
-      },
+        ...matchStage,
+        $or: [
+          { name: { $regex: search || '', $options: 'i' } },
+          { aadharnumber: { $regex: search || '', $options: 'i' } },
+          { "userData.phoneNumber": { $regex: search || '', $options: 'i' } }
+        ]
+      }
     },
     {
-      $project: {
-        password: 0,
-        refreshToken: 0,
-        forgotPasswordToken: 0,
-        phoneNumber: 0,
-        forgotPasswordTokenExpiry: 0,
-        verifyToken: 0,
-        verifyTokenExpiry: 0,
-        __v: 0,
-      },
-    },
-  ]);
-  if (employees?.length === 0) {
+      $facet: {
+        metadata: [{ $count: "total" }, { $addFields: { page, perPage } }],
+        employees: [
+          { $skip: offset },
+          { $limit: perPage },
+          {
+            $lookup: {
+              from: "cuttingmasters",
+              let: { employeeId: "$_id", role: "$role" },
+              pipeline: [
+                { $match: { $expr: { $eq: ["$employee_id", "$$employeeId"] } } },
+                { $project: { earned: 1, work: 1 } }
+              ],
+              as: "cmData"
+            }
+          },
+          {
+            $lookup: {
+              from: "tailors",
+              let: { employeeId: "$_id", role: "$role" },
+              pipeline: [
+                { $match: { $expr: { $eq: ["$employee_id", "$$employeeId"] } } },
+                { $project: { earned: 1, work: 1 } }
+              ],
+              as: "tailorData"
+            }
+          },
+          {
+            $lookup: {
+              from: "helpers",
+              let: { employeeId: "$_id", role: "$role" },
+              pipeline: [
+                { $match: { $expr: { $eq: ["$employee_id", "$$employeeId"] } } },
+                { $project: { monthly: 1 } }
+              ],
+              as: "helperData"
+            }
+          },
+          {
+            $addFields: {
+              relevantData: {
+                $switch: {
+                  branches: [
+                    { case: { $eq: ["$role", "CM"] }, then: { $arrayElemAt: ["$cmData", 0] } },
+                    { case: { $eq: ["$role", "TAILOR"] }, then: { $arrayElemAt: ["$tailorData", 0] } },
+                    { case: { $eq: ["$role", "HELPER"] }, then: { $arrayElemAt: ["$helperData", 0] } }
+                  ],
+                  default: null
+                }
+              }
+            }
+          },
+          {
+            $lookup: {
+              from: "works",
+              let: { workIds: "$relevantData.work", role: "$role" },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $in: ["$_id", "$$workIds"] },
+                        { $gte: ["$createdAt", today] },
+                        { $lt: ["$createdAt", tommorow] },
+                        { $in: ["$$role", ["CM", "TAILOR"]] }
+                      ]
+                    }
+                  }
+                },
+                { $project: { _id: 1, createdAt: 1 } }
+              ],
+              as: "todayWork"
+            }
+          },
+          {
+            $project: {
+              name: 1,
+              role: 1,
+              aadharnumber: 1,
+              advance: 1,
+              phoneNumber: "$userData.phoneNumber",
+              todayWork: {
+                $cond: [
+                  { $eq: ["$role", "HELPER"] },
+                  null,
+                  "$todayWork"
+                ]
+              },
+              earned: "$relevantData.earned",
+              monthly: {
+                $cond: [
+                  { $eq: ["$role", "HELPER"] },
+                  "$relevantData.monthly",
+                  "$$REMOVE"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  ];
+
+  const result = await EmployeeModel.aggregate(pipeline);
+
+  const employees = result[0].employees;
+  const metadata = result[0].metadata[0];
+
+  if (employees.length === 0) {
     return res.status(200).json(new ApiResponse(200, [], "No Employees found"));
   }
-  res.status(200).json(new ApiResponse(200, employees, "Employees fetched successfull"));
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        data: employees,
+        pagination: {
+          totalItems: metadata?.total || 0,
+          page: metadata?.page || page,
+          perPage: metadata?.perPage || perPage,
+          pages: metadata?.total ? Math.ceil(metadata.total / perPage) : 0,
+        },
+      },
+      "Employees fetched successfully"
+    )
+  );
 });
 
 export const getEmployeeProfile = asyncHandler(async (req, res) => {
