@@ -5,6 +5,7 @@ import fs from "fs";
 import dotenv from "dotenv";
 import morgan from "morgan";
 import cors from "cors";
+import compression from "compression";
 import connectDB from "./config/db.js";
 import cookieParser from "cookie-parser";
 import {defaultGetRouteResponseHTML} from "./constants/index.js";
@@ -29,6 +30,7 @@ app.use(
     sameSite: "none",
   })
 );
+app.use(compression());
 const routeFiles = fs.readdirSync(__dirname + "/routes/").filter((file) => file.endsWith(".js"));
 const adminRouteFiles = fs.readdirSync(__dirname + "/routes/admin").filter((file) => file.endsWith(".js"));
 for (const file of routeFiles) {
