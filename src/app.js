@@ -46,5 +46,13 @@ for (const file of adminRouteFiles) {
 app.get("/", (req, res) => {
   res.send(defaultGetRouteResponseHTML);
 });
+// global error handler
+app.use((err, req, res, next) => {
+  console.log(err);
+  res.status(500).json({
+    success: false,
+    message: err.message,
+  });
+});
 
 export default app;
