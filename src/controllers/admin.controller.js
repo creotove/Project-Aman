@@ -6,6 +6,7 @@ import uploadOnCloudinary from "../utils/cloudinary.js";
 import {unLinkFile} from "../utils/unLinkFile.js";
 import UserModel from "../models/UserModel.js";
 import AnalyticsModel from "../models/AnalyticsModel.js";
+import redisClient from "../config/redis.js";
 
 // Steps to create Customer & Employee
 // 1. Extract the values from the body
@@ -25,7 +26,7 @@ import AnalyticsModel from "../models/AnalyticsModel.js";
 
 export const addAdmin = asyncHandler(async (req, res) => {
   // Step 1
-  const {name, phoneNumber, password} = req.body;
+  const { name, phoneNumber, password } = req.body;
 
   // Step 2
   if (name.trim() === "") {
@@ -36,7 +37,7 @@ export const addAdmin = asyncHandler(async (req, res) => {
 
   // Step 3
   const existedUser = await UserModel.findOne({
-    $or: [{phoneNumber}, {name}],
+    $or: [{ phoneNumber }, { name }],
   });
   if (existedUser) {
     throw new ApiError(409, "User already exists");
@@ -85,6 +86,11 @@ export const addAdmin = asyncHandler(async (req, res) => {
 });
 
 export const getAnalytics = asyncHandler(async (req, res) => {
+  const client = await redisClient();
+  const result = await client.get('analytics');
+  if (result) {
+    return res.status(200).json(new ApiResponse(200, JSON.parse(result), "Analytics fetched successfully"));
+  }
   const qmonth = parseInt(req.query.month) || 1;
   const qyear = parseInt(req.query.year) || 2024;
 
@@ -136,5 +142,7 @@ export const getAnalytics = asyncHandler(async (req, res) => {
     },
   ]);
   if (!analytics[0]) throw new ApiError(404, "Analytics not found");
+  await client.set('analytics', JSON.stringify(analytics[0]));
+
   res.status(200).json(new ApiResponse(200, analytics[0], "Analytics fetched successfull"));
 });
