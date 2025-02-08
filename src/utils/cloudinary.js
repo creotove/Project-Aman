@@ -72,7 +72,6 @@ const uploadOnCloudinary = async (localFilePath) => {
       .catch((error) => {
         console.error("Deletion error:", error);
       });
-    return null;
   }
 };
 
