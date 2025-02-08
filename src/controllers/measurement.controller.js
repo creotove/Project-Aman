@@ -5,6 +5,7 @@ import UserModel from "../models/UserModel.js";
 import ClothingModel from "../models/ClothingModel.js";
 import MeasurementModel from "../models/MeasurementModel.js";
 import CustomerModel from "../models/CustomerModel.js";
+import {createCustomer} from "./sales.controller.js";
 export const addMeasurement = asyncHandler(async (req, res) => {
   const {id} = req.params; // customer id
   let {measurements, name} = req.body;

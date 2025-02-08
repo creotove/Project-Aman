@@ -9,7 +9,7 @@ import StitchBillModel from "../models/StitchBillModel.js";
 import {analyticsHelper, billType, cookieOptions, customerType, pipeline} from "../constants/index.js";
 import {dateHelperForAnalytics, analyticsAdd} from "../utils/analyticsAdd.js";
 
-async function createCustomer(name, phoneNumber) {
+export const createCustomer = async (name, phoneNumber) => {
   try {
     const salt = await bcryptjs.genSalt(10);
     const hashedPassword = await bcryptjs.hash(phoneNumber.toString(), salt);
@@ -35,7 +35,7 @@ async function createCustomer(name, phoneNumber) {
   } catch (error) {
     throw new ApiError(500, "Something went wrong while creating customer");
   }
-}
+};
 
 export const addSoldBill = asyncHandler(async (req, res) => {
   const {name, phoneNumber, totalAmt, billNumber} = req.body;

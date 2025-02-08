@@ -24,6 +24,7 @@ import WholeSaleBillModel from "../models/WholeSaleBillModel.js";
 import {generateOTP, sendOTPEmail} from "../utils/passwordResetMail.js";
 import {dateHelperForAnalytics, analyticsAdd} from "../utils/analyticsAdd.js";
 import generateAccessAndRefreshToken from "../utils/generateAccessAndRefreshToke.js";
+import {createCustomer} from "./sales.controller.js";
 
 // Utility function for pagination
 function paginatedData(Model) {
