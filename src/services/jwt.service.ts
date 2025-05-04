@@ -4,7 +4,7 @@ import { JWT_ACCESS_EXPIRATION_MINUTES, JWT_PRIVATE_KEY, JWT_SECRET_KEY } from '
 import { v4 } from 'uuid';
 
 let jwtidCounter = 0;
-const blacklist = [];
+export const blacklist = [];
 const JwtService = {
   jwtSign: (_payload: JwtPayload) => {
     try {

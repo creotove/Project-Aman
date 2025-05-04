@@ -6,4 +6,9 @@ export interface User {
   role: UserRole;
   password: string;
   phone: string;
+  avatar: string;
+  isActive: boolean;
+  forgotPasswordToken: string;
+  forgotPasswordTokenExpiry: Date;
+  passwordResetOTP: number;
 }

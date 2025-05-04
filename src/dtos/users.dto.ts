@@ -21,6 +21,10 @@ export class CreateUserDto {
   @IsNotEmpty()
   @IsEnum(UserRole, { message: `Invalid account type, it can be ${Object.keys(UserRole).join(', ')}. ` })
   public role: UserRole;
+
+  @IsOptional()
+  @IsString()
+  public avatar: string;
 }
 
 export class UpdateUserDto {
@@ -41,6 +45,10 @@ export class UpdateUserDto {
   @IsOptional()
   @IsEnum(UserRole, { message: `Invalid account type, it can be ${Object.keys(UserRole).join(', ')}. ` })
   public role: UserRole;
+
+  @IsOptional()
+  @IsString()
+  public avatar: string;
 }
 
 export class LoginUserDto {

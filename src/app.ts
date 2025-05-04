@@ -47,6 +47,7 @@ export class App {
       controllers: this.controllers,
       middlewares: this.middlewares,
       defaultErrorHandler: false,
+      classTransformer: false,
     });
     this.initializeErrorHandling();
   }
